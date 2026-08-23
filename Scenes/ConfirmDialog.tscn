@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://dbbt0l8akefc3"]
+
+[ext_resource type="Script" uid="uid://dgbtroftv7kbj" path="res://Scripts/ConfirmDialog.cs" id="1_3umbl"]
+
+[node name="ConfirmDialog" type="CanvasLayer" unique_id=866312422]
+script = ExtResource("1_3umbl")

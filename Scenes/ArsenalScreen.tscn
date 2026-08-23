@@ -1,0 +1,81 @@
+[gd_scene format=3 uid="uid://d2vx50dy4336m"]
+
+[ext_resource type="Texture2D" uid="uid://faqowwtc7q3o" path="res://Assets/fita_dna.png" id="2_oaryx"]
+
+[node name="ArsenalScreen" type="Control" unique_id=121679837]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=1711403837]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -773.0
+offset_top = -355.0
+offset_right = 817.0
+offset_bottom = 317.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_oaryx")
+
+[node name="AnchorW0" type="Node2D" parent="." unique_id=375707293]
+position = Vector2(1189, 472)
+
+[node name="AnchorW1" type="Node2D" parent="." unique_id=706180888]
+position = Vector2(329, 449)
+
+[node name="AnchorW2" type="Node2D" parent="." unique_id=1083303546]
+position = Vector2(565, 443)
+
+[node name="AnchorW3" type="Node2D" parent="." unique_id=185535502]
+position = Vector2(954, 414)
+
+[node name="AnchorW4" type="Node2D" parent="." unique_id=1297172845]
+position = Vector2(1363, 462)
+
+[node name="AnchorW5" type="Node2D" parent="." unique_id=1901708126]
+position = Vector2(1600, 435)
+
+[node name="AnchorP0" type="Node2D" parent="." unique_id=1382955679]
+position = Vector2(326, 592)
+
+[node name="AnchorP1" type="Node2D" parent="." unique_id=587439733]
+position = Vector2(387, 578)
+
+[node name="AnchorP2" type="Node2D" parent="." unique_id=1875971361]
+position = Vector2(567, 579)
+
+[node name="AnchorP3" type="Node2D" parent="." unique_id=7562504]
+position = Vector2(624, 628)
+
+[node name="AnchorP4" type="Node2D" parent="." unique_id=2077347823]
+position = Vector2(688, 600)
+
+[node name="AnchorP5" type="Node2D" parent="." unique_id=290985802]
+position = Vector2(743, 580)
+
+[node name="AnchorP6" type="Node2D" parent="." unique_id=1217467664]
+position = Vector2(904, 580)
+
+[node name="AnchorP7" type="Node2D" parent="." unique_id=282052866]
+position = Vector2(958, 599)
+
+[node name="AnchorP8" type="Node2D" parent="." unique_id=827966101]
+position = Vector2(1018, 601)
+
+[node name="AnchorP9" type="Node2D" parent="." unique_id=939675466]
+position = Vector2(1246, 581)
+
+[node name="AnchorP10" type="Node2D" parent="." unique_id=723715674]
+position = Vector2(1303, 596)
+
+[node name="AnchorP11" type="Node2D" parent="." unique_id=1320959511]
+position = Vector2(1414, 575)
+
+[node name="AnchorP12" type="Node2D" parent="." unique_id=2139032817]
+position = Vector2(1597, 595)

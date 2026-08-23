@@ -1,0 +1,18 @@
+# Cache do Godot
+.godot/
+
+# Build/export
+*.exe
+*.pck
+export_presets.cfg
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.sln.DotSettings.user
+bin/
+obj/
+
+# Sistema
+.DS_Store
+Thumbs.db

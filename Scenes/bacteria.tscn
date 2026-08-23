@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://cn54h85cjceev"]
+
+[ext_resource type="Script" uid="uid://ws2eqptqsc2u" path="res://Scripts/Bacteria.cs" id="1_nlyig"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_j8gqd"]
+radius = 18.0
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_7erf0"]
+
+[node name="Bacteria" type="CharacterBody2D" unique_id=1225572943]
+collision_layer = 2
+collision_mask = 9
+motion_mode = 1
+script = ExtResource("1_nlyig")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1811493441]
+shape = SubResource("CircleShape2D_j8gqd")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1533550238]
+modulate = Color(0.6651851, 1.2610514, 0.7977378, 1)
+texture = SubResource("PlaceholderTexture2D_7erf0")

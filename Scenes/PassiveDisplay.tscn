@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://v7h0un3sbg7c"]
+
+[ext_resource type="Script" uid="uid://c25tybiic5fjf" path="res://Scripts/PassiveDisplay.cs" id="1_wgt4i"]
+
+[node name="PassiveDisplay" type="CanvasLayer" unique_id=1118450786]
+script = ExtResource("1_wgt4i")

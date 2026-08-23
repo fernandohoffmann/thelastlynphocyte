@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cxs4droc5mmrq"]
+
+[ext_resource type="Script" uid="uid://cgjpdwmjkrm44" path="res://Scripts/UpgradeScreen.cs" id="1_o5sws"]
+
+[node name="UpgradeScreen" type="CanvasLayer" unique_id=388821804]
+process_mode = 3
+layer = 15
+script = ExtResource("1_o5sws")

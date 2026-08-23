@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://bha5mn2rpgnc4"]
+
+[ext_resource type="Script" uid="uid://dj6n4omme2dhx" path="res://Scripts/WeaponAnticorposGuiados.cs" id="1_j3tvp"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_4l7qv"]
+radius = 8.0
+
+[node name="WeaponAnticorposGuiados" type="Area2D" unique_id=664224801]
+collision_layer = 8
+collision_mask = 2
+script = ExtResource("1_j3tvp")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1657529960]
+shape = SubResource("CircleShape2D_4l7qv")

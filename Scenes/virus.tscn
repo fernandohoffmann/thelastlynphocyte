@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://d1wrid4mii21q"]
+
+[ext_resource type="Script" uid="uid://cpg73jjrmnipj" path="res://Scripts/Virus.cs" id="1_bpj0h"]
+[ext_resource type="Texture2D" uid="uid://d0vvrydcjruta" path="res://Assets/Sprites/virus.png" id="2_iqdem"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_iqdem"]
+radius = 22.0
+
+[node name="Virus" type="CharacterBody2D" unique_id=1448942824]
+collision_layer = 2
+collision_mask = 9
+motion_mode = 1
+script = ExtResource("1_bpj0h")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1476555983]
+shape = SubResource("CircleShape2D_iqdem")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1958974386]
+modulate = Color(1.1587777, 0.6651851, 1.2927707, 1)
+scale = Vector2(0.8, 0.8)
+texture = ExtResource("2_iqdem")

@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://ctbfwxipglhxb"]
+
+[ext_resource type="Script" uid="uid://bqa31lyfcijkj" path="res://Scripts/WeaponDisplay.cs" id="1_yxvry"]
+
+[node name="WeaponDisplay" type="CanvasLayer" unique_id=1757774885]
+script = ExtResource("1_yxvry")

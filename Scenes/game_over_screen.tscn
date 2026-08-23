@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://c1uf27v00r5tx"]
+
+[ext_resource type="Script" uid="uid://bl17vs2oue6qf" path="res://Scripts/GameOverScreen.cs" id="1_0gua7"]
+
+[node name="GameOverScreen" type="CanvasLayer" unique_id=1337293548]
+process_mode = 3
+layer = 20
+script = ExtResource("1_0gua7")

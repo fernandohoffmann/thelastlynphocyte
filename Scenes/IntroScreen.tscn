@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://ceweiuak2u7ux"]
+
+[ext_resource type="Script" uid="uid://dkhrpywxrpcpo" path="res://Scripts/IntroScreen.cs" id="1_kydkq"]
+
+[node name="IntroScreen" type="CanvasLayer" unique_id=877209445]
+script = ExtResource("1_kydkq")

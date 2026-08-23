@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://c3js8nreq7mv8"]
+
+[ext_resource type="Script" uid="uid://bblb1hsiogfm0" path="res://Scripts/GameScene.cs" id="1_x87qo"]
+[ext_resource type="PackedScene" uid="uid://da4agen1bd8c3" path="res://Scenes/player.tscn" id="2_2fmhe"]
+[ext_resource type="Script" uid="uid://b5m8websljl70" path="res://Scripts/BloodBackground.cs" id="2_ldntv"]
+[ext_resource type="PackedScene" uid="uid://bsldroqdck11o" path="res://Scenes/enemy_spawner.tscn" id="3_7iton"]
+[ext_resource type="PackedScene" uid="uid://h0omxiwpm7r4" path="res://Scenes/hud.tscn" id="4_ikfsv"]
+[ext_resource type="PackedScene" uid="uid://b4bx28nb66bj4" path="res://Scenes/pause_menu.tscn" id="5_5dgvu"]
+[ext_resource type="PackedScene" uid="uid://c1uf27v00r5tx" path="res://Scenes/game_over_screen.tscn" id="6_uscyt"]
+[ext_resource type="PackedScene" uid="uid://cxs4droc5mmrq" path="res://Scenes/upgrade_screen.tscn" id="7_4xiap"]
+[ext_resource type="PackedScene" uid="uid://ctbfwxipglhxb" path="res://Scenes/weapon_display.tscn" id="8_7iton"]
+[ext_resource type="Script" uid="uid://cthv1f7l8n4kg" path="res://Scripts/CameraTilt.cs" id="8_w8jfd"]
+[ext_resource type="PackedScene" uid="uid://v7h0un3sbg7c" path="res://Scenes/PassiveDisplay.tscn" id="9_ikfsv"]
+[ext_resource type="Script" uid="uid://crunjgqox4vdj" path="res://Scripts/Vignette.cs" id="12_gtbs0"]
+[ext_resource type="Script" uid="uid://dnfol65anoe6o" path="res://Scripts/Minimap.cs" id="20_mipjh"]
+
+[node name="GameScene" type="Node2D" unique_id=1447001910]
+script = ExtResource("1_x87qo")
+
+[node name="World" type="Node2D" parent="." unique_id=2027481384]
+
+[node name="BloodBackground" type="Node2D" parent="World" unique_id=1146309744]
+script = ExtResource("2_ldntv")
+
+[node name="Player" parent="World" unique_id=2089412770 instance=ExtResource("2_2fmhe")]
+
+[node name="EnemySpawner" parent="World" unique_id=1903977617 instance=ExtResource("3_7iton")]
+
+[node name="CameraTilt" type="Node" parent="World" unique_id=999377541]
+script = ExtResource("8_w8jfd")
+
+[node name="HUD" parent="." unique_id=1522047195 instance=ExtResource("4_ikfsv")]
+
+[node name="Vignette" type="CanvasLayer" parent="." unique_id=1329252792]
+script = ExtResource("12_gtbs0")
+
+[node name="PauseMenu" parent="." unique_id=536533679 instance=ExtResource("5_5dgvu")]
+
+[node name="GameOverScreen" parent="." unique_id=1337293548 instance=ExtResource("6_uscyt")]
+
+[node name="UpgradeScreen" parent="." unique_id=388821804 instance=ExtResource("7_4xiap")]
+
+[node name="WeaponDisplay" parent="." unique_id=1757774885 instance=ExtResource("8_7iton")]
+
+[node name="PassiveDisplay" parent="." unique_id=1118450786 instance=ExtResource("9_ikfsv")]
+
+[node name="Minimap" type="CanvasLayer" parent="." unique_id=565370533]
+script = ExtResource("20_mipjh")
