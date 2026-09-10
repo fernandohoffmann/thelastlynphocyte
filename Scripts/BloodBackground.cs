@@ -14,12 +14,36 @@ public partial class BloodBackground : Node2D
 		QueueRedraw();
 	}
 
+	public override void _Process(double delta)
+	{
+		if (GameManager.Instance == null || !GameManager.Instance.IsGameRunning) return;
+
+		float t = GameManager.Instance.ElapsedTime;
+		Color target;
+
+		if (t < 600f)
+		{
+			target = Colors.White; // 0-10 min: primeiros sinais
+		}
+		else if (t < 1200f)
+		{
+			float p = (t - 600f) / 600f;
+			target = Colors.White.Lerp(new Color(0.75f, 0.55f, 0.8f), p); // 10-20 min: arroxeado
+		}
+		else
+		{
+			float p = Mathf.Min((t - 1200f) / 600f, 1f);
+			target = new Color(0.75f, 0.55f, 0.8f).Lerp(new Color(0.28f, 0.2f, 0.3f), p); // 20-30 min: critico
+		}
+
+		Modulate = Modulate.Lerp(target, 2f * (float)delta);
+	}
+
 	public override void _Draw()
 	{
 		if (_bgTexture == null)
 		{
-			DrawRect(new Rect2(-AREA, -AREA, AREA * 2, AREA * 2),
-				new Color(0.42f, 0.06f, 0.10f));
+			DrawRect(new Rect2(-AREA, -AREA, AREA * 2, AREA * 2), new Color(0.42f, 0.06f, 0.10f));
 			return;
 		}
 

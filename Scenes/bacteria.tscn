@@ -1,11 +1,130 @@
 [gd_scene format=3 uid="uid://cn54h85cjceev"]
 
 [ext_resource type="Script" uid="uid://ws2eqptqsc2u" path="res://Scripts/Bacteria.cs" id="1_nlyig"]
+[ext_resource type="Texture2D" uid="uid://dagh7wi2vk8ww" path="res://Assets/Sprites/bacteriasa.png" id="2_j8gqd"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_j8gqd"]
 radius = 18.0
 
-[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_7erf0"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_7erf0"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hiqbo"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cru41"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1iacf"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(768, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_t5jwl"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(0, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xvr52"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(256, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_vq0mr"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(512, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_gplhl"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(768, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_d4qom"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(0, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_us0ex"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(256, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qcgey"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(512, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_bxmp0"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(768, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_kql0l"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(0, 768, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lpuwo"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(256, 768, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2u050"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(512, 768, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_d0dqk"]
+atlas = ExtResource("2_j8gqd")
+region = Rect2(768, 768, 256, 256)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_ska7k"]
+animations = [{
+"frames": [{
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_7erf0")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_hiqbo")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_cru41")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_1iacf")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_t5jwl")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_xvr52")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_vq0mr")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_gplhl")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_d4qom")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_us0ex")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_qcgey")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_bxmp0")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_kql0l")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_lpuwo")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_2u050")
+}, {
+"duration": 0.51,
+"texture": SubResource("AtlasTexture_d0dqk")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
 
 [node name="Bacteria" type="CharacterBody2D" unique_id=1225572943]
 collision_layer = 2
@@ -16,6 +135,6 @@ script = ExtResource("1_nlyig")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1811493441]
 shape = SubResource("CircleShape2D_j8gqd")
 
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1533550238]
-modulate = Color(0.6651851, 1.2610514, 0.7977378, 1)
-texture = SubResource("PlaceholderTexture2D_7erf0")
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=285797772]
+sprite_frames = SubResource("SpriteFrames_ska7k")
+frame_progress = 0.23587652

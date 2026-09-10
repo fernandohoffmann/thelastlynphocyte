@@ -1,4 +1,6 @@
+// Minimap.cs — completo, revelação em círculos + marcador de colônias
 using Godot;
+using System.Collections.Generic;
 
 public partial class Minimap : CanvasLayer
 {
@@ -8,11 +10,15 @@ public partial class Minimap : CanvasLayer
 	private const float BIG_W    = 700f;
 	private const float BIG_H    = 700f;
 	private const float REVEAL_R = 500f;
+	private const float POINT_SPACING = 60f;
+	private const int   MAX_POINTS    = 4000;
 
-	private TileMapLayer _navLayer;
-	private Vector2I[]   _navCells;
-	private float[]      _revealAlpha;
-	private Rect2I       _navBounds;
+	private List<Vector2> _visitedPoints = new List<Vector2>();
+	private Vector2 _lastRecordedPos;
+	private bool    _hasLastRecorded = false;
+
+	private Rect2 _playableArea;
+	private bool  _areaInitialized = false;
 
 	private MinimapDrawer _smallDrawer;
 	private MinimapDrawer _bigDrawer;
@@ -20,19 +26,16 @@ public partial class Minimap : CanvasLayer
 	public Vector2 SmoothedPlayerWorld { get; private set; }
 	private bool _smoothInit = false;
 
-	// Textura pré-renderizada do mapa grande
-	private SubViewport       _bigViewport;
-	private SubViewportContainer _bigViewportContainer;
-	private bool              _bigDirty   = true;
-	private float             _dirtyTimer = 0f;
-	private const float       DIRTY_INTERVAL = 0.1f; // atualiza no máximo 10x/s
+	private bool  _bigDirty   = true;
+	private float _dirtyTimer = 0f;
+	private const float DIRTY_INTERVAL = 0.1f;
 
 	public override void _Ready()
 	{
 		Layer       = 7;
 		ProcessMode = ProcessModeEnum.Always;
 
-		CallDeferred(MethodName.InitNavLayer);
+		CallDeferred(MethodName.SubscribeToGameManager);
 
 		var root = new Control();
 		root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
@@ -41,7 +44,7 @@ public partial class Minimap : CanvasLayer
 
 		_smallDrawer = new MinimapDrawer();
 		_smallDrawer.Init(this, MAP_W, MAP_H, false);
-		_smallDrawer.ClipContents = false;
+		_smallDrawer.ClipContents = true;
 		_smallDrawer.SetAnchorsPreset(Control.LayoutPreset.TopRight);
 		_smallDrawer.OffsetLeft   = -(MAP_W + MARGIN);
 		_smallDrawer.OffsetTop    = MARGIN + 14f;
@@ -51,7 +54,7 @@ public partial class Minimap : CanvasLayer
 
 		_bigDrawer = new MinimapDrawer();
 		_bigDrawer.Init(this, BIG_W, BIG_H, true);
-		_bigDrawer.ClipContents = false;
+		_bigDrawer.ClipContents = true;
 		_bigDrawer.SetAnchorsPreset(Control.LayoutPreset.Center);
 		_bigDrawer.OffsetLeft   = -BIG_W / 2f;
 		_bigDrawer.OffsetTop    = -BIG_H / 2f;
@@ -61,19 +64,30 @@ public partial class Minimap : CanvasLayer
 		root.AddChild(_bigDrawer);
 	}
 
-	private void InitNavLayer()
+	private void SubscribeToGameManager()
 	{
-		_navLayer = GetTree().CurrentScene?.GetNodeOrNull<TileMapLayer>("World/NavLayer");
-		if (_navLayer == null) return;
+		if (GameManager.Instance == null)
+		{
+			CallDeferred(MethodName.SubscribeToGameManager);
+			return;
+		}
 
-		var cells    = _navLayer.GetUsedCells();
-		_navCells    = new Vector2I[cells.Count];
-		_revealAlpha = new float[cells.Count];
+		GameManager.Instance.PlayableAreaChanged += InitArea;
+		InitArea();
+	}
 
-		for (int i = 0; i < cells.Count; i++)
-			_navCells[i] = cells[i];
+	public override void _ExitTree()
+	{
+		if (GameManager.Instance != null)
+			GameManager.Instance.PlayableAreaChanged -= InitArea;
+	}
 
-		_navBounds = _navLayer.GetUsedRect();
+	private void InitArea()
+	{
+		if (GameManager.Instance == null) return;
+
+		_playableArea    = GameManager.Instance.PlayableArea;
+		_areaInitialized = true;
 	}
 
 	public override void _Process(double delta)
@@ -92,19 +106,17 @@ public partial class Minimap : CanvasLayer
 				SmoothedPlayerWorld = SmoothedPlayerWorld.Lerp(target, 20f * (float)delta);
 			}
 
-			if (_navCells != null)
+			if (_areaInitialized)
 			{
-				bool revealed = RevealNearPlayer(target, (float)delta);
-				if (revealed) _bigDirty = true;
+				bool added = TryRecordPoint(target);
+				if (added) _bigDirty = true;
 			}
 		}
 
 		bool tab = Input.IsKeyPressed(Key.Tab);
 
-		// Minimap pequeno sempre atualiza (leve)
 		_smallDrawer.QueueRedraw();
 
-		// Mapa grande: só atualiza se dirty e em intervalo limitado
 		if (tab)
 		{
 			_bigDrawer.Visible = true;
@@ -116,7 +128,6 @@ public partial class Minimap : CanvasLayer
 				_dirtyTimer = 0f;
 				_bigDrawer.QueueRedraw();
 			}
-			// Sempre pede redraw para o ponto do player (leve)
 			_bigDrawer.QueueRedraw();
 		}
 		else
@@ -125,73 +136,50 @@ public partial class Minimap : CanvasLayer
 		}
 	}
 
-	// Retorna true se algum tile foi revelado
-	private bool RevealNearPlayer(Vector2 worldPos, float delta)
+	private bool TryRecordPoint(Vector2 worldPos)
 	{
-		if (_navLayer == null) return false;
+		if (_visitedPoints.Count >= MAX_POINTS) return false;
 
-		Vector2I playerTile = _navLayer.LocalToMap(_navLayer.ToLocal(worldPos));
-		float    tileSize   = _navLayer.TileSet.TileSize.X;
-		bool     changed    = false;
-
-		for (int i = 0; i < _navCells.Length; i++)
+		if (!_hasLastRecorded || worldPos.DistanceTo(_lastRecordedPos) >= POINT_SPACING)
 		{
-			int   dx   = _navCells[i].X - playerTile.X;
-			int   dy   = _navCells[i].Y - playerTile.Y;
-			float dist = Mathf.Sqrt(dx * dx + dy * dy) * tileSize;
-
-			if (dist > REVEAL_R) continue;
-
-			float prev = _revealAlpha[i];
-			float t    = 1f - Mathf.Clamp(dist / REVEAL_R, 0f, 1f);
-			_revealAlpha[i] = Mathf.Min(1f, _revealAlpha[i] + Mathf.Pow(t, 0.4f) * delta * 5f);
-
-			if (_revealAlpha[i] != prev) changed = true;
+			_visitedPoints.Add(worldPos);
+			_lastRecordedPos = worldPos;
+			_hasLastRecorded = true;
+			return true;
 		}
 
-		return changed;
+		return false;
 	}
 
 	public Vector2 WorldToMapSmooth(float w, float h)
 	{
-		if (_navLayer == null) return new Vector2(w / 2f, h / 2f);
+		if (!_areaInitialized) return new Vector2(w / 2f, h / 2f);
 		return WorldToMap(SmoothedPlayerWorld, w, h);
-	}
-
-	public Vector2 TileToMap(Vector2I tile, float w, float h)
-	{
-		if (_navBounds.Size == Vector2I.Zero) return Vector2.Zero;
-		float nx = (float)(tile.X - _navBounds.Position.X) / _navBounds.Size.X;
-		float ny = (float)(tile.Y - _navBounds.Position.Y) / _navBounds.Size.Y;
-		return new Vector2(Mathf.Clamp(nx * w, 0, w), Mathf.Clamp(ny * h, 0, h));
 	}
 
 	public Vector2 WorldToMap(Vector2 worldPos, float w, float h)
 	{
-		if (_navLayer == null) return Vector2.Zero;
-		var  local  = _navLayer.ToLocal(worldPos);
-		var  bounds = _navBounds;
-		if (bounds.Size == Vector2I.Zero) return Vector2.Zero;
+		if (!_areaInitialized || _playableArea.Size.X <= 0f || _playableArea.Size.Y <= 0f)
+			return Vector2.Zero;
 
-		float tileSize = _navLayer.TileSet.TileSize.X;
-		float nx = (local.X / tileSize - bounds.Position.X) / bounds.Size.X;
-		float ny = (local.Y / tileSize - bounds.Position.Y) / bounds.Size.Y;
+		float nx = (worldPos.X - _playableArea.Position.X) / _playableArea.Size.X;
+		float ny = (worldPos.Y - _playableArea.Position.Y) / _playableArea.Size.Y;
 		return new Vector2(Mathf.Clamp(nx * w, 0, w), Mathf.Clamp(ny * h, 0, h));
 	}
 
-	public Vector2I[]   NavCells    => _navCells;
-	public float[]      RevealAlpha => _revealAlpha;
-	public TileMapLayer NavLayer    => _navLayer;
-	public Rect2I       NavBounds   => _navBounds;
+	public bool           AreaInitialized  => _areaInitialized;
+	public Rect2           PlayableAreaRect => _playableArea;
+	public List<Vector2>   VisitedPoints    => _visitedPoints;
+	public float           RevealRadius     => REVEAL_R;
 }
 
 public partial class MinimapDrawer : Control
 {
-	private static readonly Color BG_COLOR      = new Color(0.28f, 0.05f, 0.08f);
-	private static readonly Color TILE_HIDDEN   = new Color(0.28f, 0.05f, 0.08f);
-	private static readonly Color TILE_REVEALED = new Color(0.75f, 0.25f, 0.30f);
-	private static readonly Color BORDER_COLOR  = new Color(0.6f,  0.6f,  0.6f, 0.8f);
-	private static readonly Color PLAYER_COLOR  = new Color(0.3f,  0.7f,  1f);
+	private static readonly Color BG_COLOR           = new Color(0.28f, 0.05f, 0.08f);
+	private static readonly Color TILE_REVEALED      = new Color(0.75f, 0.25f, 0.30f);
+	private static readonly Color BORDER_COLOR       = new Color(0.6f,  0.6f,  0.6f, 0.8f);
+	private static readonly Color PLAYER_COLOR       = new Color(0.3f,  0.7f,  1f);
+	private static readonly Color COLONY_MARKER_COLOR = new Color(1f,   0.15f, 0.15f);
 
 	private Minimap _minimap;
 	private float   _w, _h;
@@ -211,23 +199,15 @@ public partial class MinimapDrawer : Control
 
 		DrawRect(new Rect2(0, 0, _w, _h), BG_COLOR);
 
-		var cells  = _minimap.NavCells;
-		var alpha  = _minimap.RevealAlpha;
-		var bounds = _minimap.NavBounds;
-
-		if (cells != null && bounds.Size != Vector2I.Zero)
+		if (_minimap.AreaInitialized)
 		{
 			if (_isBig)
-			{
-				DrawAllCellsBase(cells, bounds);
-				DrawAllCells(cells, alpha, bounds);
-			}
+				DrawFogBig();
 			else
-			{
-				DrawZoomedCellsBase(cells);
-				DrawZoomedCells(cells, alpha);
-			}
+				DrawFogZoomed();
 		}
+
+		DrawColonyMarkers();
 
 		if (Player.Instance != null)
 		{
@@ -237,7 +217,6 @@ public partial class MinimapDrawer : Control
 			DrawCircle(p, size, PLAYER_COLOR);
 		}
 
-		// Borda sólida na cor do fundo — cobre pixels que vazem
 		float b = 3f;
 		DrawRect(new Rect2(0,    0,    _w, b),  BG_COLOR);
 		DrawRect(new Rect2(0,    _h-b, _w, b),  BG_COLOR);
@@ -253,101 +232,82 @@ public partial class MinimapDrawer : Control
 				new Color(0.7f, 0.7f, 0.7f, 0.7f));
 	}
 
-	private void DrawAllCellsBase(Vector2I[] cells, Rect2I bounds)
+	// Mapa grande: cada ponto visitado vira um círculo na posição normalizada
+	private void DrawFogBig()
 	{
-		float tileW = Mathf.Max(_w / bounds.Size.X, 1.5f);
-		float tileH = Mathf.Max(_h / bounds.Size.Y, 1.5f);
+		var area = _minimap.PlayableAreaRect;
+		if (area.Size.X <= 0f || area.Size.Y <= 0f) return;
 
-		for (int i = 0; i < cells.Length; i++)
+		float scaleX = _w / area.Size.X;
+		float scaleY = _h / area.Size.Y;
+		float radius = _minimap.RevealRadius * ((scaleX + scaleY) / 2f);
+
+		foreach (var point in _minimap.VisitedPoints)
 		{
-			Vector2 pos = _minimap.TileToMap(cells[i], _w, _h);
-			if (pos.X + tileW < 0 || pos.Y + tileH < 0 || pos.X > _w || pos.Y > _h) continue;
-			DrawRect(new Rect2(pos.X, pos.Y, tileW + 0.5f, tileH + 0.5f), TILE_HIDDEN);
+			Vector2 p = _minimap.WorldToMap(point, _w, _h);
+			DrawCircle(p, radius, TILE_REVEALED, true, -1f, true);
 		}
 	}
 
-	private void DrawAllCells(Vector2I[] cells, float[] alpha, Rect2I bounds)
+	// Minimap pequeno: zoom centrado no player, só desenha pontos próximos
+	private void DrawFogZoomed()
 	{
-		float tileW = Mathf.Max(_w / bounds.Size.X, 1.5f);
-		float tileH = Mathf.Max(_h / bounds.Size.Y, 1.5f);
+		if (Player.Instance == null) return;
 
-		for (int i = 0; i < cells.Length; i++)
+		Vector2 playerWorld   = Player.Instance.GlobalPosition;
+		float   zoomWorldSize = _minimap.RevealRadius * 3.2f;
+		float   scale         = (_w / 2f) / zoomWorldSize;
+		float   radius        = _minimap.RevealRadius * scale;
+
+		Vector2 center = new Vector2(_w / 2f, _h / 2f);
+
+		foreach (var point in _minimap.VisitedPoints)
 		{
-			if (alpha[i] <= 0f) continue;
-			Vector2 pos = _minimap.TileToMap(cells[i], _w, _h);
-			if (pos.X + tileW < 0 || pos.Y + tileH < 0 || pos.X > _w || pos.Y > _h) continue;
-			DrawRect(new Rect2(pos.X, pos.Y, tileW + 0.5f, tileH + 0.5f),
-				new Color(TILE_REVEALED, alpha[i]));
+			Vector2 diff = point - playerWorld;
+			if (diff.LengthSquared() > (zoomWorldSize * 1.6f) * (zoomWorldSize * 1.6f)) continue;
+
+			Vector2 p = center + diff * scale;
+			DrawCircle(p, radius, TILE_REVEALED, true, -1f, true);
 		}
 	}
 
-	private void DrawZoomedCellsBase(Vector2I[] cells)
+	// Marca a posição de cada colônia viva — sempre visível, mesmo em área não revelada.
+	private void DrawColonyMarkers()
 	{
-		var navLayer = _minimap.NavLayer;
-		if (navLayer == null || Player.Instance == null) return;
+		var colonies = GetTree().GetNodesInGroup("Colony");
+		if (colonies.Count == 0) return;
 
-		const int VIEW_TILES  = 50;
-		Vector2   realWorld   = Player.Instance.GlobalPosition;
-		Vector2   local       = navLayer.ToLocal(realWorld);
-		float     tileSize    = navLayer.TileSet.TileSize.X;
-		float     playerTileX = local.X / tileSize;
-		float     playerTileY = local.Y / tileSize;
-		float     tileW       = _w / VIEW_TILES;
-		float     tileH       = _h / VIEW_TILES;
-		int       half        = VIEW_TILES / 2;
+		float pulse = 0.6f + 0.4f * (float)Mathf.Sin(Time.GetTicksMsec() / 200.0);
 
-		for (int i = 0; i < cells.Length; i++)
+		foreach (Node n in colonies)
 		{
-			float dx = cells[i].X - playerTileX;
-			float dy = cells[i].Y - playerTileY;
-			if (dx < -half || dx > half || dy < -half || dy > half) continue;
+			if (n is not Node2D colony || !IsInstanceValid(colony)) continue;
 
-			float px = _w / 2f + dx * tileW;
-			float py = _h / 2f + dy * tileH;
+			Vector2 p;
 
-			float rx = Mathf.Max(0, px);
-			float ry = Mathf.Max(0, py);
-			float rw = Mathf.Min(px + tileW, _w) - rx;
-			float rh = Mathf.Min(py + tileH, _h) - ry;
-			if (rw <= 0 || rh <= 0) continue;
+			if (_isBig)
+			{
+				p = _minimap.WorldToMap(colony.GlobalPosition, _w, _h);
+			}
+			else
+			{
+				if (Player.Instance == null) continue;
+				Vector2 diff = colony.GlobalPosition - Player.Instance.GlobalPosition;
+				float zoomWorldSize = _minimap.RevealRadius * 3.2f;
+				if (diff.Length() > zoomWorldSize * 1.6f) continue; // fora do alcance do minimapa pequeno
+				float scale = (_w / 2f) / zoomWorldSize;
+				p = new Vector2(_w / 2f, _h / 2f) + diff * scale;
+			}
 
-			DrawRect(new Rect2(rx, ry, rw, rh), TILE_HIDDEN);
-		}
-	}
+			float size = _isBig ? 7f : 5f;
 
-	private void DrawZoomedCells(Vector2I[] cells, float[] alpha)
-	{
-		var navLayer = _minimap.NavLayer;
-		if (navLayer == null || Player.Instance == null) return;
+			DrawCircle(p, size + 3f, new Color(COLONY_MARKER_COLOR, 0.20f + 0.15f * pulse));
+			DrawCircle(p, size * pulse, COLONY_MARKER_COLOR);
 
-		const int VIEW_TILES  = 50;
-		Vector2   realWorld   = Player.Instance.GlobalPosition;
-		Vector2   local       = navLayer.ToLocal(realWorld);
-		float     tileSize    = navLayer.TileSet.TileSize.X;
-		float     playerTileX = local.X / tileSize;
-		float     playerTileY = local.Y / tileSize;
-		float     tileW       = _w / VIEW_TILES;
-		float     tileH       = _h / VIEW_TILES;
-		int       half        = VIEW_TILES / 2;
-
-		for (int i = 0; i < cells.Length; i++)
-		{
-			if (alpha[i] <= 0f) continue;
-
-			float dx = cells[i].X - playerTileX;
-			float dy = cells[i].Y - playerTileY;
-			if (dx < -half || dx > half || dy < -half || dy > half) continue;
-
-			float px = _w / 2f + dx * tileW;
-			float py = _h / 2f + dy * tileH;
-
-			float rx = Mathf.Max(0, px);
-			float ry = Mathf.Max(0, py);
-			float rw = Mathf.Min(px + tileW, _w) - rx;
-			float rh = Mathf.Min(py + tileH, _h) - ry;
-			if (rw <= 0 || rh <= 0) continue;
-
-			DrawRect(new Rect2(rx, ry, rw, rh), new Color(TILE_REVEALED, alpha[i]));
+			// "X" branco por cima, reforça que é um alvo de missão
+			float h2 = size * 0.5f;
+			DrawLine(p + new Vector2(-h2, -h2), p + new Vector2(h2, h2), Colors.White, 1.5f);
+			DrawLine(p + new Vector2(-h2,  h2), p + new Vector2(h2, -h2), Colors.White, 1.5f);
 		}
 	}
 }

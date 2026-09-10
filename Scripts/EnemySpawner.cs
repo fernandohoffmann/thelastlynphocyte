@@ -1,19 +1,20 @@
+// EnemySpawner.cs — completo, usando PlayableArea em vez de NavLayer
 using Godot;
 
 public partial class EnemySpawner : Node2D
 {
-	private float        _spawnTimer    = 0f;
-	private float        _baseInterval  = 1.2f;
-	private Node2D       _player;
-	private TileMapLayer _tileMap;
-	private TileMapLayer _navLayer;
+	private float  _spawnTimer   = 0f;
+	private float  _baseInterval = 1.2f;
+	private Node2D _player;
 
-	private const float SCREEN_HALF_W  = 1060f;
-	private const float SCREEN_HALF_H  =  640f;
-	private const int   MAX_TRIES      = 50;
-	private const int   MAX_ENEMIES    = 60;   // limite global
-	private const float DESPAWN_DIST   = 2200f; // distância para desaparecer
-	private const float DESPAWN_INTERVAL = 2f;  // verifica a cada 2s
+	private const float SCREEN_HALF_W    = 1060f;
+	private const float SCREEN_HALF_H    =  640f;
+	private const int   MAX_TRIES        = 50;
+	private const int   MAX_ENEMIES      = 60;
+	private const float DESPAWN_DIST     = 2200f;
+	private const float DESPAWN_INTERVAL = 2f;
+	private const float EDGE_MARGIN      = 60f; // distância mínima da borda da PlayableArea
+
 	private float _despawnTimer = 0f;
 
 	public override void _Ready()
@@ -23,16 +24,13 @@ public partial class EnemySpawner : Node2D
 
 	private void FindNodes()
 	{
-		_player   = GetTree().GetFirstNodeInGroup("Player") as Node2D;
-		_tileMap  = GetTree().CurrentScene.GetNodeOrNull<TileMapLayer>("World/TileMapLayer");
-		_navLayer = GetTree().CurrentScene.GetNodeOrNull<TileMapLayer>("World/NavLayer");
+		_player = GetTree().GetFirstNodeInGroup("Player") as Node2D;
 	}
 
 	public override void _Process(double delta)
 	{
 		if (GameManager.Instance == null || !GameManager.Instance.IsGameRunning) return;
 
-		// ── Despawn periódico ─────────────────────────────────────
 		_despawnTimer += (float)delta;
 		if (_despawnTimer >= DESPAWN_INTERVAL)
 		{
@@ -40,12 +38,10 @@ public partial class EnemySpawner : Node2D
 			DespawnFarEnemies();
 		}
 
-		// ── Spawn ─────────────────────────────────────────────────
 		_spawnTimer += (float)delta;
 
 		float diff     = GameManager.Instance.DifficultyMultiplier;
-		float interval = Mathf.Max(0.2f, _baseInterval / diff);
-
+			float interval = Mathf.Max(0.2f, (_baseInterval / diff) * GameManager.Instance.SpawnIntervalMultiplier);
 		if (_spawnTimer >= interval)
 		{
 			_spawnTimer = 0f;
@@ -73,13 +69,10 @@ public partial class EnemySpawner : Node2D
 	{
 		if (_player == null) { FindNodes(); return; }
 
-		// Não spawna se já tem muitos inimigos
 		int currentCount = GetTree().GetNodesInGroup("Enemy").Count;
 		if (currentCount >= MAX_ENEMIES) return;
 
 		int count = Mathf.Min(1 + (int)((diff - 1f) * 1.2f), 10);
-
-		// Limita para não ultrapassar o máximo
 		count = Mathf.Min(count, MAX_ENEMIES - currentCount);
 
 		for (int i = 0; i < count; i++)
@@ -126,25 +119,26 @@ public partial class EnemySpawner : Node2D
 				break;
 		}
 
-		return _player.GlobalPosition + new Vector2(x, y);
+		Vector2 pos = _player.GlobalPosition + new Vector2(x, y);
+
+		// Restringe para dentro da PlayableArea, respeitando a margem
+		if (GameManager.Instance != null)
+			pos = GameManager.Instance.ClampToPlayableArea(pos, EDGE_MARGIN);
+
+		return pos;
 	}
 
 	private bool IsValidSpawn(Vector2 worldPos)
 	{
-		if (_navLayer != null)
+		// Confere se a posição está dentro da área jogável
+		if (GameManager.Instance != null)
 		{
-			Vector2I coord = _navLayer.LocalToMap(_navLayer.ToLocal(worldPos));
-			if (_navLayer.GetCellTileData(coord) == null)
+			var area = GameManager.Instance.PlayableArea;
+			if (!area.HasPoint(worldPos))
 				return false;
 		}
 
-		if (_tileMap != null)
-		{
-			Vector2I coord = _tileMap.LocalToMap(_tileMap.ToLocal(worldPos));
-			if (_tileMap.GetCellTileData(coord) != null)
-				return false;
-		}
-
+		// Confere se não tem parede/obstáculo físico ali perto
 		var space = GetWorld2D().DirectSpaceState;
 		float checkDist = 48f;
 		Vector2[] dirs =

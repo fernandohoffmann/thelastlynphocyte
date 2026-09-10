@@ -5,6 +5,8 @@ public enum EnemyType { None, Bacteria, Virus }
 
 public partial class Enemy : CharacterBody2D
 {
+	public static event System.Action<Enemy> EnemyDied;
+
 	public EnemyType Type       = EnemyType.Bacteria;
 	public float BaseSpeed      = 80f;
 	public int   BaseHp         = 10;
@@ -163,6 +165,7 @@ public partial class Enemy : CharacterBody2D
 			SpawnXpDrop();
 			if (GD.Randf() < 0.05f) SpawnHeartDrop();
 			GameManager.Instance?.GainDna(1);
+			EnemyDied?.Invoke(this);
 			QueueFree();
 		}
 	}
@@ -173,6 +176,7 @@ public partial class Enemy : CharacterBody2D
 		if (GD.Randf() < 0.05f) SpawnHeartDrop();
 		Player.Instance?.TriggerHemoglobinaExplosion(GlobalPosition);
 		GameManager.Instance?.GainDna(1);
+		EnemyDied?.Invoke(this);
 		QueueFree();
 	}
 

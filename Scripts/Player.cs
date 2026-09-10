@@ -43,7 +43,6 @@ public partial class Player : CharacterBody2D
 	private const float ACCEL        = 1800f;
 	private const float DECEL        = 1400f;
 
-	// Flag para evitar recursão na hemoglobina
 	private bool _hemoglobinaActive = false;
 
 	private AnimatedSprite2D _animSprite;
@@ -99,6 +98,19 @@ public partial class Player : CharacterBody2D
 			_animSprite.Modulate = Colors.White;
 		}
 
+		// ── Sprite sempre aponta para o cursor, com rotação suave ──
+		if (_animSprite != null)
+		{
+			Vector2 mousePos = GetGlobalMousePosition();
+			Vector2 lookDir  = mousePos - GlobalPosition;
+			if (lookDir.LengthSquared() > 0.01f)
+			{
+				float targetAngle = lookDir.Angle();
+				_animSprite.Rotation = Mathf.LerpAngle(_animSprite.Rotation, targetAngle, 12f * (float)delta);
+			}
+		}
+
+		// ── Movimento ────────────────────────────────────────────
 		Vector2 dir = Vector2.Zero;
 		if (Input.IsActionPressed("move_right")) dir.X += 1;
 		if (Input.IsActionPressed("move_left"))  dir.X -= 1;
@@ -199,29 +211,28 @@ public partial class Player : CharacterBody2D
 	}
 
 	public void TriggerHemoglobinaExplosion(Vector2 position)
-{
-	if (!HasHemoglobinaReativa) return;
-	if (_hemoglobinaActive) return;
-	_hemoglobinaActive = true;
+	{
+		if (!HasHemoglobinaReativa) return;
+		if (_hemoglobinaActive) return;
+		_hemoglobinaActive = true;
 
-	// Efeito visual de fumaça
-	var smoke = new HemoglobinaSmoke();
-	smoke.Radius = HemoglobinRadius;
-	GetTree().CurrentScene.AddChild(smoke);
-	smoke.GlobalPosition = position;
+		var smoke = new HemoglobinaSmoke();
+		smoke.Radius = HemoglobinRadius;
+		GetTree().CurrentScene.AddChild(smoke);
+		smoke.GlobalPosition = position;
 
-	var enemies = GetTree().GetNodesInGroup("Enemy");
-	var toHit   = new System.Collections.Generic.List<Enemy>();
-	foreach (Node node in enemies)
-		if (node is Enemy enemy && IsInstanceValid(enemy) && enemy.GlobalPosition.DistanceTo(position) <= HemoglobinRadius)
-			toHit.Add(enemy);
+		var enemies = GetTree().GetNodesInGroup("Enemy");
+		var toHit   = new List<Enemy>();
+		foreach (Node node in enemies)
+			if (node is Enemy enemy && IsInstanceValid(enemy) && enemy.GlobalPosition.DistanceTo(position) <= HemoglobinRadius)
+				toHit.Add(enemy);
 
-	foreach (var enemy in toHit)
-		if (IsInstanceValid(enemy))
-			enemy.TakeDamageNoHemoglobina((int)HemoglobinDamage);
+		foreach (var enemy in toHit)
+			if (IsInstanceValid(enemy))
+				enemy.TakeDamageNoHemoglobina((int)HemoglobinDamage);
 
-	_hemoglobinaActive = false;
-}
+		_hemoglobinaActive = false;
+	}
 
 	public float GetAdrenalineFactor()
 	{
