@@ -8,7 +8,7 @@ public class MissionData
 	public string Title;
 	public MissionType Type;
 	public int Target;
-	public float TimeLimit; // usado só em KillTimed
+	public float TimeLimit;
 }
 
 public partial class MissionManager : Node
@@ -25,6 +25,10 @@ public partial class MissionManager : Node
 
 	private int _coloniesDestroyed = 0;
 	private const int COLONIES_TOTAL = 3;
+
+	// Boss deve nascer bem longe do jogador
+	private const int   BOSS_SPAWN_SAMPLES = 24;
+	private const float BOSS_SPAWN_MARGIN  = 150f;
 
 	public override void _Ready()
 	{
@@ -73,11 +77,15 @@ public partial class MissionManager : Node
 			}
 			else if (_subTimer >= m.TimeLimit)
 			{
-				// Prazo esgotado: reinicia a contagem, dando nova chance ao jogador
 				_progress = 0;
 				_subTimer = 0f;
 				EmitProgress();
 			}
+		}
+		else if (m.Type == MissionType.DefeatBoss)
+		{
+			// Atualiza o HP do boss em tempo real no painel de missão
+			EmitProgress();
 		}
 	}
 
@@ -117,7 +125,7 @@ public partial class MissionManager : Node
 			MissionType.KillBacteria    => $"{_progress}/{m.Target}",
 			MissionType.DestroyColonies => $"{_coloniesDestroyed}/{m.Target}",
 			MissionType.KillTimed       => $"{_progress}/{m.Target} ({Mathf.Max(0, m.TimeLimit - _subTimer):0}s)",
-			MissionType.DefeatBoss      => ChagasBoss.Instance != null
+			MissionType.DefeatBoss      => ChagasBoss.Instance != null && IsInstanceValid(ChagasBoss.Instance)
 				? $"{ChagasBoss.Instance.Hp}/{ChagasBoss.Instance.MaxHp} HP"
 				: "Boss derrotado!",
 			_ => ""
@@ -134,7 +142,7 @@ public partial class MissionManager : Node
 		if (enemy is Colony)
 		{
 			_coloniesDestroyed++;
-			GameManager.Instance?.ReduceSpawnRate(0.15f); // spawn 15% mais lento por colônia
+			GameManager.Instance?.ReduceSpawnRate(0.15f);
 
 			if (m.Type == MissionType.DestroyColonies)
 			{
@@ -147,7 +155,11 @@ public partial class MissionManager : Node
 
 		if (enemy is ChagasBoss)
 		{
-			if (m.Type == MissionType.DefeatBoss) CompleteCurrentMission();
+			if (m.Type == MissionType.DefeatBoss)
+			{
+				EmitProgress(); // manda o "Boss derrotado!" antes de trocar de missão
+				CompleteCurrentMission();
+			}
 			return;
 		}
 
@@ -165,6 +177,9 @@ public partial class MissionManager : Node
 		}
 	}
 
+	// folga minima da parede pra colonia/boss (o corpo deles e grande)
+	private const float COLONY_WALL_MARGIN = 70f;
+
 	private void SpawnColonies(int count)
 	{
 		if (GameManager.Instance == null) return;
@@ -172,10 +187,20 @@ public partial class MissionManager : Node
 
 		for (int i = 0; i < count; i++)
 		{
-			Vector2 pos = new Vector2(
-				(float)GD.RandRange(area.Position.X + 200, area.End.X - 200),
-				(float)GD.RandRange(area.Position.Y + 200, area.End.Y - 200)
-			);
+			Vector2 pos = Vector2.Zero;
+
+			// Sorteia ate cair num lugar livre. Sem isso a colonia pode
+			// nascer dentro de uma veia e ficar inalcancavel.
+			for (int tries = 0; tries < 300; tries++)
+			{
+				pos = new Vector2(
+					(float)GD.RandRange(area.Position.X + 200, area.End.X - 200),
+					(float)GD.RandRange(area.Position.Y + 200, area.End.Y - 200)
+				);
+
+				if (VeinMap.Instance == null || VeinMap.Instance.IsWalkable(pos, COLONY_WALL_MARGIN))
+					break;
+			}
 
 			var colony = new Colony();
 			GetTree().CurrentScene.AddChild(colony);
@@ -183,14 +208,59 @@ public partial class MissionManager : Node
 		}
 	}
 
+	// Nasce PERTO do jogador, numa faixa de distancia: longe o bastante pra nao
+	// aparecer em cima dele, perto o bastante pra encontrar na hora.
+	private const float BOSS_NEAR_MIN = 420f;
+	private const float BOSS_NEAR_MAX = 800f;
+
 	private void SpawnBoss()
 	{
-		if (GameManager.Instance == null) return;
-		var area   = GameManager.Instance.PlayableArea;
-		var center = area.Position + area.Size / 2f;
+		if (GameManager.Instance == null || Player.Instance == null) return;
+
+		var     area      = GameManager.Instance.PlayableArea;
+		Vector2 playerPos = Player.Instance.GlobalPosition;
+		Vector2 bestPos   = playerPos;
+		bool    found     = false;
+
+		for (int i = 0; i < BOSS_SPAWN_SAMPLES * 4; i++)
+		{
+			float   ang  = (float)GD.RandRange(0.0, Mathf.Tau);
+			float   dist = (float)GD.RandRange(BOSS_NEAR_MIN, BOSS_NEAR_MAX);
+			Vector2 cand = playerPos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * dist;
+
+			// dentro do mapa
+			if (!area.HasPoint(cand)) continue;
+
+			if (VeinMap.Instance != null)
+			{
+				// fora da parede...
+				if (!VeinMap.Instance.IsWalkable(cand, COLONY_WALL_MARGIN)) continue;
+				// ...e do mesmo lado das veias que o jogador, senao ele nasce
+				// atras de uma parede e demora pra dar a volta
+				if (!VeinMap.Instance.HasLineOfSight(cand, playerPos, 10f)) continue;
+			}
+
+			bestPos = cand;
+			found   = true;
+			break;
+		}
+
+		if (!found && VeinMap.Instance != null)
+			bestPos = VeinMap.Instance.RandomWalkablePoint(COLONY_WALL_MARGIN);
 
 		var boss = new ChagasBoss();
 		GetTree().CurrentScene.AddChild(boss);
-		boss.GlobalPosition = center;
+		boss.GlobalPosition = bestPos;
+
+		GD.Print($"[MissionManager] boss nasceu a {bestPos.DistanceTo(playerPos):F0}px do player");
+	}
+
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if (@event is InputEventKey key && key.Pressed && !key.Echo && key.Keycode == Key.F9)
+		{
+			GD.Print("[DEBUG] Pulando missao atual: ", _currentIndex);
+			CompleteCurrentMission();
+		}
 	}
 }

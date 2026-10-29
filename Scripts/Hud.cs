@@ -135,11 +135,37 @@ public partial class Hud : CanvasLayer
 			CallDeferred(MethodName.ConnectMissionSignal);
 	}
 
+	private int _missionRetries = 0;
+
+	// ATENCAO: este retry precisa de saida.
+	// O Godot esvazia a fila de chamadas diferidas processando tambem o que e
+	// adicionado durante o esvaziamento. Sem limite, numa fase sem missoes
+	// (fase 2) isto vira laco infinito dentro do mesmo quadro e trava o jogo.
 	private void ConnectMissionSignal()
 	{
-		if (MissionManager.Instance == null) { CallDeferred(MethodName.ConnectMissionSignal); return; }
-		MissionManager.Instance.MissionChanged += OnMissionChanged;
+		if (MissionManager.Instance != null)
+		{
+			MissionManager.Instance.MissionChanged += OnMissionChanged;
+			return;
+		}
+
+		// fase declarada sem missoes, ou o MissionManager demorou demais
+		if (!GamePhase.Data.HasMissions || ++_missionRetries > 120)
+		{
+			HideMissionWidgets();
+			return;
+		}
+
+		CallDeferred(MethodName.ConnectMissionSignal);
 	}
+
+	private void HideMissionWidgets()
+	{
+		if (_missionTitleLabel != null)    _missionTitleLabel.Visible    = false;
+		if (_missionProgressLabel != null) _missionProgressLabel.Visible = false;
+	}
+
+	private int _lastHp = -1, _lastMaxHp = -1, _lastMin = -1, _lastSec = -1;
 
 	public override void _Process(double delta)
 	{
@@ -149,7 +175,14 @@ public partial class Hud : CanvasLayer
 		{
 			_hpBar.MaxValue = Player.Instance.MaxHp;
 			_hpBar.Value    = Player.Instance.CurrentHp;
-			_hpLabel.Text   = $"HP: {Player.Instance.CurrentHp} / {Player.Instance.MaxHp}";
+
+			// so remonta a string quando o numero muda
+			int hp = Player.Instance.CurrentHp, maxHp = Player.Instance.MaxHp;
+			if (hp != _lastHp || maxHp != _lastMaxHp)
+			{
+				_lastHp = hp; _lastMaxHp = maxHp;
+				_hpLabel.Text = $"HP: {hp} / {maxHp}";
+			}
 			_xpBar.MaxValue = Player.Instance.XpForNext;
 			_xpBar.Value    = Player.Instance.CurrentXp;
 		}
@@ -157,7 +190,11 @@ public partial class Hud : CanvasLayer
 		float rem = GameManager.Instance.GetRemainingTime();
 		int   min = (int)(rem / 60);
 		int   sec = (int)(rem % 60);
-		_timerLabel.Text = $"{min:00}:{sec:00}";
+		if (sec != _lastSec || min != _lastMin)
+		{
+			_lastMin = min; _lastSec = sec;
+			_timerLabel.Text = $"{min:00}:{sec:00}";
+		}
 
 		// Barra do boss — só aparece se ele existir
 		if (ChagasBoss.Instance != null && IsInstanceValid(ChagasBoss.Instance))

@@ -10,6 +10,8 @@ public partial class HomingProjectile : Area2D
 	private float   _lifetime  = 6f;
 	private float   _age       = 0f;
 	private Node2D  _target;
+	private float  _retarget = 0f;
+	private const float RETARGET_INTERVAL = 0.1f;
 	private Sprite2D _sprite;
 
 	public override void _Ready()
@@ -33,6 +35,8 @@ public partial class HomingProjectile : Area2D
 		AddChild(_sprite);
 
 		FindClosestTarget();
+		// cada projetil comeca o ciclo de re-alvo num instante diferente
+		_retarget = (float)GD.RandRange(0.0, RETARGET_INTERVAL);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -40,7 +44,14 @@ public partial class HomingProjectile : Area2D
 		_age += (float)delta;
 		if (_age >= _lifetime) { QueueFree(); return; }
 
-		FindClosestTarget();
+		// Antes isso rodava TODO frame, em cada projetil. Como a mira ja e
+		// suavizada por LerpAngle, 10x por segundo da o mesmo resultado visual.
+		_retarget -= (float)delta;
+		if (_retarget <= 0f || !IsInstanceValid(_target))
+		{
+			_retarget = RETARGET_INTERVAL;
+			FindClosestTarget();
+		}
 
 		if (IsInstanceValid(_target))
 		{
@@ -74,16 +85,7 @@ public partial class HomingProjectile : Area2D
 
 	private void FindClosestTarget()
 	{
-		float best = float.MaxValue;
-		_target    = null;
-		foreach (Node n in GetTree().GetNodesInGroup("Enemy"))
-		{
-			if (n is Node2D e && IsInstanceValid(e))
-			{
-				float d = GlobalPosition.DistanceTo(e.GlobalPosition);
-				if (d < best) { best = d; _target = e; }
-			}
-		}
+		_target = Enemy.FindClosest(GlobalPosition);
 	}
 }
 

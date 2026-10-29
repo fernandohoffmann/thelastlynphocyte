@@ -52,6 +52,10 @@ public partial class UpgradeManager : Node
 
 	private bool _firstLevelUp = true;
 
+	// Se true, quando TUDO do loadout chega no nivel maximo o jogo libera
+	// o resto do pool. Deixe false pra um loadout 100% fechado.
+	public const bool ALLOW_FALLBACK = true;
+
 	public override void _Ready()
 	{
 		if (Instance != null) { QueueFree(); return; }
@@ -159,106 +163,83 @@ public partial class UpgradeManager : Node
 
 	public List<UpgradeOption> GetLevelUpOptions(int count = 3)
 	{
-		var result = new List<UpgradeOption>();
-		var used   = new HashSet<UpgradeId>();
-
-		// 1. Prioridade: itens do loadout desbloqueados ainda não adquiridos
-		foreach (var id in LoadoutPreferences)
-		{
-			if (result.Count >= count) break;
-			if (!_pool.TryGetValue(id, out var opt)) continue;
-			if (opt.CurrentLevel >= MAX_LEVEL) continue;
-			if (used.Contains(id)) continue;
-			if (!SaveData.IsUnlocked(id.ToString())) continue;
-			result.Add(opt);
-			used.Add(id);
-		}
-
-		// 2. Complemento: itens já equipados que podem subir de nível
-		if (result.Count < count)
-		{
-			var upgradeable = new List<UpgradeOption>();
-			foreach (var id in EquippedWeapons)
-			{
-				if (!_pool.TryGetValue(id, out var opt)) continue;
-				if (opt.CurrentLevel > 0 && opt.CurrentLevel < MAX_LEVEL && !used.Contains(id))
-					upgradeable.Add(opt);
-			}
-			foreach (var id in EquippedPassives)
-			{
-				if (!_pool.TryGetValue(id, out var opt)) continue;
-				if (opt.CurrentLevel > 0 && opt.CurrentLevel < MAX_LEVEL && !used.Contains(id))
-					upgradeable.Add(opt);
-			}
-			for (int i = upgradeable.Count - 1; i > 0; i--)
-			{
-				int j = (int)(GD.Randi() % (uint)(i + 1));
-				(upgradeable[i], upgradeable[j]) = (upgradeable[j], upgradeable[i]);
-			}
-			foreach (var opt in upgradeable)
-			{
-				if (result.Count >= count) break;
-				result.Add(opt);
-				used.Add(opt.Id);
-			}
-		}
-
-		// 3. Fallback: apenas itens DESBLOQUEADOS no Arsenal
-		if (result.Count < count)
-		{
-			var all = new List<UpgradeOption>();
-			foreach (var opt in _pool.Values)
-				if (SaveData.IsUnlocked(opt.Id.ToString()))
-					all.Add(opt);
-
-			for (int i = all.Count - 1; i > 0; i--)
-			{
-				int j = (int)(GD.Randi() % (uint)(i + 1));
-				(all[i], all[j]) = (all[j], all[i]);
-			}
-			foreach (var opt in all)
-			{
-				if (result.Count >= count) break;
-				if (opt.CurrentLevel >= MAX_LEVEL) continue;
-				if (used.Contains(opt.Id)) continue;
-				result.Add(opt);
-				used.Add(opt.Id);
-			}
-		}
-
-		// ── Garante pelo menos 1 ARMA na primeira escolha da run ──
+		// Primeira escolha da run (logo após a cutscene): só armas, garantido
 		if (_firstLevelUp)
 		{
 			_firstLevelUp = false;
-
-			bool hasWeapon = false;
-			foreach (var opt in result)
-				if (opt.IsWeapon) { hasWeapon = true; break; }
-
-			if (!hasWeapon && result.Count > 0)
-			{
-				UpgradeOption weaponToForce = null;
-
-				foreach (var id in LoadoutPreferences)
-					if (_pool.TryGetValue(id, out var opt) && opt.IsWeapon
-						&& SaveData.IsUnlocked(id.ToString()))
-						{ weaponToForce = opt; break; }
-
-				if (weaponToForce == null)
-					foreach (var opt in _pool.Values)
-						if (opt.IsWeapon && SaveData.IsUnlocked(opt.Id.ToString()))
-							{ weaponToForce = opt; break; }
-
-				if (weaponToForce != null)
-					result[0] = weaponToForce;
-			}
+			return GetRandomWeaponOptions(count);
 		}
 
-		return result;
+		var candidates = new List<UpgradeOption>();
+		var used = new HashSet<UpgradeId>();
+
+		bool TryAdd(UpgradeId id)
+		{
+			if (used.Contains(id)) return false;
+			if (!_pool.TryGetValue(id, out var opt)) return false;
+			if (opt.CurrentLevel >= MAX_LEVEL) return false;
+			if (!SaveData.IsUnlocked(id.ToString())) return false;
+
+			// nao oferece arma/passiva NOVA se os slots ja estao cheios
+			if (opt.CurrentLevel == 0)
+			{
+				if (opt.IsWeapon  && EquippedWeapons.Count  >= MAX_WEAPONS)  return false;
+				if (!opt.IsWeapon && EquippedPassives.Count >= MAX_PASSIVES) return false;
+			}
+
+			candidates.Add(opt);
+			used.Add(id);
+			return true;
+		}
+
+		// Só o que o jogador escolheu no loadout (+ o que ja esta equipado).
+		foreach (var id in LoadoutPreferences) TryAdd(id);
+		foreach (var id in EquippedWeapons)    TryAdd(id);
+		foreach (var id in EquippedPassives)   TryAdd(id);
+
+		// Fallback: se o loadout inteiro chegou no nivel maximo (ou veio vazio),
+		// abre o resto do pool pra tela de level-up nao aparecer vazia.
+		if (candidates.Count == 0 && ALLOW_FALLBACK)
+		{
+			GD.Print("[UpgradeManager] loadout esgotado — liberando o resto do pool");
+			foreach (var opt in _pool.Values) TryAdd(opt.Id);
+		}
+
+		Shuffle(candidates);
+		return candidates.GetRange(0, Mathf.Min(count, candidates.Count));
+	}
+
+	private List<UpgradeOption> GetRandomWeaponOptions(int count)
+	{
+		var candidates = new List<UpgradeOption>();
+
+		foreach (var id in LoadoutPreferences)
+			if (_pool.TryGetValue(id, out var opt) && opt.IsWeapon && SaveData.IsUnlocked(id.ToString()))
+				candidates.Add(opt);
+
+		if (candidates.Count == 0)
+			foreach (var opt in _pool.Values)
+				if (opt.IsWeapon && SaveData.IsUnlocked(opt.Id.ToString()))
+					candidates.Add(opt);
+
+		Shuffle(candidates);
+		return candidates.GetRange(0, Mathf.Min(count, candidates.Count));
+	}
+
+	private void Shuffle(List<UpgradeOption> list)
+	{
+		for (int i = list.Count - 1; i > 0; i--)
+		{
+			int j = (int)(GD.Randi() % (uint)(i + 1));
+			(list[i], list[j]) = (list[j], list[i]);
+		}
 	}
 
 	public void ApplyUpgrade(UpgradeId id, bool forceLevel1 = false)
 	{
+		// o item entrou em jogo: registra a descoberta correspondente
+		Codex.OnUpgradeEquipped(id);
+
 		if (!_pool.TryGetValue(id, out var opt)) return;
 
 		if (forceLevel1)
@@ -272,46 +253,64 @@ public partial class UpgradeManager : Node
 		switch (id)
 		{
 			case UpgradeId.Anticorpos:
-				GetOrAdd<WeaponAnticorpos>(p, "WeaponAnticorpos").UpgradeLevel();
+			{
+				var w = GetOrAdd<WeaponAnticorpos>(p, "WeaponAnticorpos", out bool isNew);
+				if (!isNew) w.UpgradeLevel();
 				if (!EquippedWeapons.Contains(id)) EquippedWeapons.Add(id);
 				GetDisplay()?.RegisterWeapon(id.ToString(), id);
 				GetDisplay()?.UpdateWeaponLevel(id.ToString(), opt.CurrentLevel);
 				break;
+			}
 
 			case UpgradeId.AnticorposGuiados:
-				GetOrAdd<WeaponAnticorposGuiados>(p, "WeaponAnticorposGuiados").UpgradeLevel();
+			{
+				var w = GetOrAdd<WeaponAnticorposGuiados>(p, "WeaponAnticorposGuiados", out bool isNew);
+				if (!isNew) w.UpgradeLevel();
 				if (!EquippedWeapons.Contains(id)) EquippedWeapons.Add(id);
 				GetDisplay()?.RegisterWeapon(id.ToString(), id);
 				GetDisplay()?.UpdateWeaponLevel(id.ToString(), opt.CurrentLevel);
 				break;
+			}
 
 			case UpgradeId.ProteinaComplemento:
-				GetOrAdd<WeaponProteinaComplemento>(p, "WeaponProteinaComplemento").UpgradeLevel();
+			{
+				var w = GetOrAdd<WeaponProteinaComplemento>(p, "WeaponProteinaComplemento", out bool isNew);
+				if (!isNew) w.UpgradeLevel();
 				if (!EquippedWeapons.Contains(id)) EquippedWeapons.Add(id);
 				GetDisplay()?.RegisterWeapon(id.ToString(), id);
 				GetDisplay()?.UpdateWeaponLevel(id.ToString(), opt.CurrentLevel);
 				break;
+			}
 
 			case UpgradeId.TentaculoFagocitario:
-				GetOrAdd<WeaponTentaculo>(p, "WeaponTentaculo").UpgradeLevel();
+			{
+				var w = GetOrAdd<WeaponTentaculo>(p, "WeaponTentaculo", out bool isNew);
+				if (!isNew) w.UpgradeLevel();
 				if (!EquippedWeapons.Contains(id)) EquippedWeapons.Add(id);
 				GetDisplay()?.RegisterWeapon(id.ToString(), id);
 				GetDisplay()?.UpdateWeaponLevel(id.ToString(), opt.CurrentLevel);
 				break;
+			}
 
 			case UpgradeId.TempestandeCitocinas:
-				GetOrAdd<WeaponCitocinas>(p, "WeaponCitocinas").UpgradeLevel();
+			{
+				var w = GetOrAdd<WeaponCitocinas>(p, "WeaponCitocinas", out bool isNew);
+				if (!isNew) w.UpgradeLevel();
 				if (!EquippedWeapons.Contains(id)) EquippedWeapons.Add(id);
 				GetDisplay()?.RegisterWeapon(id.ToString(), id);
 				GetDisplay()?.UpdateWeaponLevel(id.ToString(), opt.CurrentLevel);
 				break;
+			}
 
 			case UpgradeId.Macrofago:
-				GetOrAdd<WeaponMacrofago>(p, "WeaponMacrofago").UpgradeLevel();
+			{
+				var w = GetOrAdd<WeaponMacrofago>(p, "WeaponMacrofago", out bool isNew);
+				if (!isNew) w.UpgradeLevel();
 				if (!EquippedWeapons.Contains(id)) EquippedWeapons.Add(id);
 				GetDisplay()?.RegisterWeapon(id.ToString(), id);
 				GetDisplay()?.UpdateWeaponLevel(id.ToString(), opt.CurrentLevel);
 				break;
+			}
 
 			case UpgradeId.SistemaImuneReforcado:
 				if (!EquippedPassives.Contains(id)) EquippedPassives.Add(id);
@@ -397,12 +396,13 @@ public partial class UpgradeManager : Node
 		}
 	}
 
-	private T GetOrAdd<T>(Node parent, string nodeName) where T : Node2D, new()
+	private T GetOrAdd<T>(Node parent, string nodeName, out bool isNew) where T : Node2D, new()
 	{
 		var existing = parent.GetNodeOrNull<T>(nodeName);
-		if (existing != null) return existing;
+		if (existing != null) { isNew = false; return existing; }
 		var node = new T { Name = nodeName };
 		parent.AddChild(node);
+		isNew = true;
 		return node;
 	}
 

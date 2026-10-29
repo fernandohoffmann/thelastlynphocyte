@@ -2,74 +2,10 @@
 
 [ext_resource type="Script" uid="uid://dohkyvbohm8uq" path="res://Scripts/Player.cs" id="1_cvnsp"]
 [ext_resource type="Texture2D" uid="uid://x3wrjqmob0ml" path="res://Assets/light_texture.tres" id="3_6t5aa"]
-[ext_resource type="Texture2D" uid="uid://dom66hk5rqqbx" path="res://Assets/Sprites/linfocito.png" id="4_vgqql"]
+[ext_resource type="Texture2D" uid="uid://di8b7ojf5238" path="res://Assets/Sprites/linfocito 1.png" id="3_vgqql"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_0bb2n"]
 radius = 16.0
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_fkybt"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(0, 256, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_x3wgy"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(0, 0, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_3smsa"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(0, 512, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_8erm5"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(512, 256, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_f1ek2"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(512, 0, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_tx1dd"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(512, 512, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_gymyn"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(0, 768, 512, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_pu2lt"]
-atlas = ExtResource("4_vgqql")
-region = Rect2(512, 768, 512, 256)
-
-[sub_resource type="SpriteFrames" id="SpriteFrames_ukyrk"]
-animations = [{
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_fkybt")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_x3wgy")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_3smsa")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_8erm5")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_f1ek2")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_tx1dd")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_gymyn")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_pu2lt")
-}],
-"loop": true,
-"name": &"default",
-"speed": 6.0
-}]
 
 [node name="Player" type="CharacterBody2D" unique_id=2089412770]
 collision_mask = 8
@@ -91,7 +27,7 @@ shadow_filter = 1
 texture = ExtResource("3_6t5aa")
 texture_scale = 2.0
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=608528318]
-scale = Vector2(0.15, 0.15)
-sprite_frames = SubResource("SpriteFrames_ukyrk")
-frame_progress = 0.5015492
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1156152967]
+position = Vector2(-3.8146973e-06, -3.8146973e-06)
+scale = Vector2(0.05023921, 0.05023921)
+texture = ExtResource("3_vgqql")

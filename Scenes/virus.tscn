@@ -15,7 +15,6 @@ script = ExtResource("1_bpj0h")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1476555983]
 shape = SubResource("CircleShape2D_iqdem")
 
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1958974386]
-modulate = Color(1.1587777, 0.6651851, 1.2927707, 1)
-scale = Vector2(0.8, 0.8)
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1863097592]
+scale = Vector2(0.06937798, 0.06937798)
 texture = ExtResource("2_iqdem")

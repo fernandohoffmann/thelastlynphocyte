@@ -26,6 +26,44 @@ public partial class GameScene : Node2D
 		{
 			GameManager.Instance?.SetPlayableArea(playableAreaNode);
 			CreateBoundaryWalls(GameManager.Instance.PlayableArea);
+
+			// O molde de Line2D e o tilemap sao cenario da fase 1: escondidos
+			// SEMPRE aqui fora, senao aparecem no meio do pulmao.
+			var painted = GetNodeOrNull<Node2D>("World/VeinPaint");
+			if (painted != null) painted.Visible = false;
+
+			var tileMap = GetNodeOrNull<CanvasItem>("World/TileMapLayer");
+			if (tileMap != null) tileMap.Visible = GamePhase.Data.ShowTileMap;
+
+			if (GamePhase.Data.HasVeinWalls)
+			{
+				var veins = new VeinMap { Name = "VeinMap" };
+				GetNode("World").AddChild(veins);
+				veins.Build(GameManager.Instance.PlayableArea, painted);
+
+				// Marker2D opcional "PlayerSpawn" define onde o player nasce
+				var spawnMarker = GetNodeOrNull<Marker2D>("World/PlayerSpawn");
+				player.GlobalPosition = spawnMarker != null
+					? spawnMarker.GlobalPosition
+					: veins.SpawnPoint;
+			}
+			else if (GamePhase.Data.HasLungWalls)
+			{
+				// A silhueta do pulmao vira parede; as ramificacoes bronquicas
+				// sao so cenario, sem colisao nenhuma.
+				var lungMap = new VeinMap { Name = "VeinMap" };
+				GetNode("World").AddChild(lungMap);
+				lungMap.BuildLung(GameManager.Instance.PlayableArea);
+
+				// a respiracao precisa existir ANTES do cenario, que le dela
+				AddChild(new LungBreath { Name = "LungBreath" });
+				GetNode("World").AddChild(new LungBackground { Name = "LungBackground" });
+				player.GlobalPosition = lungMap.SpawnPoint;
+			}
+			else
+			{
+				player.GlobalPosition = GameManager.Instance.PlayableArea.GetCenter();
+			}
 		}
 		else
 		{
@@ -34,17 +72,42 @@ public partial class GameScene : Node2D
 
 		AudioManager.Instance?.PlayHeartLoop();
 
-		// ── Sistema de missões ──────────────────────────────────
-		_missionManager = new MissionManager { Name = "MissionManager" };
-		AddChild(_missionManager);
-		_missionManager.AllMissionsCompleted += OnAllMissionsCompleted;
+		// ── Codex ────────────────────────────────────────────────
+		Codex.Hook();                       // liga nos eventos que o jogo ja tem
+		AddChild(new CodexToast { Name = "CodexToast" });
+		Codex.Discover(
+			CodexId.Veia, CodexId.CorrenteSanguinea, CodexId.Plasma, CodexId.Tecido,
+			CodexId.Linfocito, CodexId.Hemacia, CodexId.Circulacao);
 
-		_missionCompleteScreen = new MissionCompleteScreen { Name = "MissionCompleteScreen" };
-		AddChild(_missionCompleteScreen);
+		// ── Sistema de missões ──────────────────────────────────
+		// A fase 2 ainda nao tem missoes: roda so contra o relogio.
+		if (GamePhase.Data.HasMissions)
+		{
+			_missionManager = new MissionManager { Name = "MissionManager" };
+			AddChild(_missionManager);
+			_missionManager.AllMissionsCompleted += OnAllMissionsCompleted;
+
+			_missionCompleteScreen = new MissionCompleteScreen { Name = "MissionCompleteScreen" };
+			AddChild(_missionCompleteScreen);
+		}
 
 		var options = UpgradeManager.Instance?.GetLevelUpOptions(3);
 		if (options != null && options.Count > 0)
 			_upgradeScreen?.ShowOptions(options);
+
+		// ── Efeitos visuais ──────────────────────────────────────
+		if (DebugPanel.ENABLED)
+			AddChild(new DebugPanel { Name = "DebugPanel" });
+
+		SetupGlowEnvironment();
+		if (GamePhase.Data.HasVeinOverlay)
+			AddChild(new VeinOverlay { Name = "VeinOverlay" });
+		AddChild(new AmbientShading { Name = "AmbientShading" });
+		AddChild(new VisionOverlay  { Name = "VisionOverlay"  });
+
+		// globulos vermelhos boiando pela corrente sanguinea
+		if (GamePhase.Data.HasBloodCells)
+			GetNode("World").AddChild(new BloodCellField { Name = "BloodCellField" });
 	}
 
 	// Cria quatro paredes físicas (StaticBody2D) ao redor da PlayableArea.
@@ -90,11 +153,35 @@ public partial class GameScene : Node2D
 		parent.AddChild(body);
 	}
 
+	// Um level-up de cada vez. Subir varios niveis de uma vez (debug, ou dois
+	// drops grandes juntos) chamaria ShowOptions em sequencia e so a ultima
+	// chamada apareceria — as escolhas anteriores se perderiam.
 	private void OnLevelUp(int newLevel)
 	{
+		DebugPanel.PendingLevelUps++;
+		TryShowNextUpgrade();
+	}
+
+	private void TryShowNextUpgrade()
+	{
+		if (DebugPanel.PendingLevelUps <= 0) return;
+		if (_upgradeScreen == null || _upgradeScreen.Visible) return;
+
 		var options = UpgradeManager.Instance?.GetLevelUpOptions(3);
-		if (options != null && options.Count > 0)
-			_upgradeScreen?.ShowOptions(options);
+		if (options == null || options.Count == 0)
+		{
+			DebugPanel.PendingLevelUps = 0;   // nada pra oferecer: limpa a fila
+			return;
+		}
+
+		DebugPanel.PendingLevelUps--;
+		_upgradeScreen.ShowOptions(options);
+	}
+
+	public override void _Process(double delta)
+	{
+		// a tela de upgrade nao avisa quando fecha, entao a fila e drenada aqui
+		TryShowNextUpgrade();
 	}
 
 	private void OnPlayerDied()
@@ -106,5 +193,22 @@ public partial class GameScene : Node2D
 	{
 		GameManager.Instance?.EndGameVictory();
 		_missionCompleteScreen?.ShowScreen();
+	}
+
+	private void SetupGlowEnvironment()
+	{
+		GetViewport().UseHdr2D = true; // sem isso, o glow nao aparece no 2D
+
+		var env = new Godot.Environment();
+		env.BackgroundMode      = Godot.Environment.BGMode.Canvas;
+		env.GlowEnabled         = true;
+		env.GlowIntensity       = 0.9f;
+		env.GlowStrength        = 1.1f;
+		env.GlowBloom           = 0.05f;
+		env.GlowBlendMode       = Godot.Environment.GlowBlendModeEnum.Softlight;
+		env.GlowHdrThreshold    = 0.9f; // só o que é "brilhante" (luzes aditivas) gera glow
+
+		var worldEnv = new WorldEnvironment { Environment = env };
+		AddChild(worldEnv);
 	}
 }

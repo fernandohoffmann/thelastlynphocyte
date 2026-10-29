@@ -1,3 +1,4 @@
+// GameOverScreen.cs — completo, com a assinatura desfeita corretamente
 using Godot;
 
 public partial class GameOverScreen : CanvasLayer
@@ -32,7 +33,6 @@ public partial class GameOverScreen : CanvasLayer
 		vbox.AddThemeConstantOverride("separation", 10);
 		panel.AddChild(vbox);
 
-		// Título
 		var title = new Label
 		{
 			Text                = "GAME OVER",
@@ -52,7 +52,6 @@ public partial class GameOverScreen : CanvasLayer
 
 		vbox.AddChild(new HSeparator());
 
-		// Tempo sobrevivido
 		_timeLabel = new Label
 		{
 			Text                = "Tempo: 00:00",
@@ -61,7 +60,6 @@ public partial class GameOverScreen : CanvasLayer
 		_timeLabel.AddThemeFontSizeOverride("font_size", 14);
 		vbox.AddChild(_timeLabel);
 
-		// DNA ganho na run
 		_dnaRunLabel = new Label
 		{
 			Text                = "🧬 DNA coletado: 0",
@@ -71,7 +69,6 @@ public partial class GameOverScreen : CanvasLayer
 		_dnaRunLabel.AddThemeColorOverride("font_color", new Color(0.4f, 1f, 0.5f));
 		vbox.AddChild(_dnaRunLabel);
 
-		// DNA total
 		_dnaTotalLabel = new Label
 		{
 			Text                = "🧬 DNA total: 0",
@@ -83,7 +80,6 @@ public partial class GameOverScreen : CanvasLayer
 
 		vbox.AddChild(new HSeparator());
 
-		// Botões
 		var retryBtn = new Button { Text = "Tentar Novamente" };
 		retryBtn.CustomMinimumSize = new Vector2(0, 44);
 		retryBtn.AddThemeFontSizeOverride("font_size", 15);
@@ -100,21 +96,24 @@ public partial class GameOverScreen : CanvasLayer
 		menuBtn.Pressed += () => GameManager.Instance.ReturnToMenu();
 		vbox.AddChild(menuBtn);
 
-		// Conecta ao sinal de game over
 		GameManager.Instance.GameOver += OnGameOver;
+	}
+
+	public override void _ExitTree()
+	{
+		if (GameManager.Instance != null)
+			GameManager.Instance.GameOver -= OnGameOver;
 	}
 
 	private void OnGameOver()
 	{
 		AudioManager.Instance?.StopHeartLoop();
-		// Tempo sobrevivido
 		float elapsed = GameManager.Instance.ElapsedTime;
 		int   min     = (int)(elapsed / 60);
 		int   sec     = (int)(elapsed % 60);
 		_timeLabel.Text = $"Tempo sobrevivido: {min:00}:{sec:00}";
 
-		// DNA da run
-		_dnaRunLabel.Text  = $"🧬 DNA coletado: +{GameManager.Instance.SessionDna}";
+		_dnaRunLabel.Text   = $"🧬 DNA coletado: +{GameManager.Instance.SessionDna}";
 		_dnaTotalLabel.Text = $"🧬 DNA total: {SaveData.TotalDna}";
 
 		Visible          = true;

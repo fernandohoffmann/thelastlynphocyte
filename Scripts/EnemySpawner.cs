@@ -1,4 +1,4 @@
-// EnemySpawner.cs — completo, usando PlayableArea em vez de NavLayer
+// EnemySpawner.cs — completo, usando PlayableArea + VeinMap
 using Godot;
 
 public partial class EnemySpawner : Node2D
@@ -9,11 +9,12 @@ public partial class EnemySpawner : Node2D
 
 	private const float SCREEN_HALF_W    = 1060f;
 	private const float SCREEN_HALF_H    =  640f;
-	private const int   MAX_TRIES        = 50;
+	private const int   MAX_TRIES        = 120;
 	private const int   MAX_ENEMIES      = 60;
 	private const float DESPAWN_DIST     = 2200f;
 	private const float DESPAWN_INTERVAL = 2f;
 	private const float EDGE_MARGIN      = 60f; // distância mínima da borda da PlayableArea
+	private const float WALL_MARGIN      = 60f; // distância mínima da parede de veia
 
 	private float _despawnTimer = 0f;
 
@@ -41,7 +42,8 @@ public partial class EnemySpawner : Node2D
 		_spawnTimer += (float)delta;
 
 		float diff     = GameManager.Instance.DifficultyMultiplier;
-			float interval = Mathf.Max(0.2f, (_baseInterval / diff) * GameManager.Instance.SpawnIntervalMultiplier);
+		float interval = Mathf.Max(0.2f, (_baseInterval / diff) * GameManager.Instance.SpawnIntervalMultiplier);
+
 		if (_spawnTimer >= interval)
 		{
 			_spawnTimer = 0f;
@@ -53,15 +55,13 @@ public partial class EnemySpawner : Node2D
 	{
 		if (_player == null) return;
 
-		var enemies = GetTree().GetNodesInGroup("Enemy");
-		foreach (Node n in enemies)
+		foreach (Enemy e in Enemy.All)
 		{
-			if (n is Enemy e && IsInstanceValid(e))
-			{
-				float dist = e.GlobalPosition.DistanceTo(_player.GlobalPosition);
-				if (dist > DESPAWN_DIST)
-					e.QueueFree();
-			}
+			if (e is Colony || e is ChagasBoss) continue; // objetivos de missao nunca despawnam por distancia
+			if (!IsInstanceValid(e)) continue;
+
+			if (e.GlobalPosition.DistanceTo(_player.GlobalPosition) > DESPAWN_DIST)
+				e.QueueFree();
 		}
 	}
 
@@ -69,7 +69,7 @@ public partial class EnemySpawner : Node2D
 	{
 		if (_player == null) { FindNodes(); return; }
 
-		int currentCount = GetTree().GetNodesInGroup("Enemy").Count;
+		int currentCount = Enemy.All.Count;
 		if (currentCount >= MAX_ENEMIES) return;
 
 		int count = Mathf.Min(1 + (int)((diff - 1f) * 1.2f), 10);
@@ -135,6 +135,20 @@ public partial class EnemySpawner : Node2D
 		{
 			var area = GameManager.Instance.PlayableArea;
 			if (!area.HasPoint(worldPos))
+				return false;
+		}
+
+		if (VeinMap.Instance != null)
+		{
+			// Não pode nascer dentro da parede.
+			if (!VeinMap.Instance.IsWalkable(worldPos, WALL_MARGIN))
+				return false;
+
+			// E precisa ter caminho RETO até o player. Os inimigos andam sempre em
+			// linha reta, então nascer do outro lado de uma veia significa ficar
+			// encostado nela pra sempre.
+			if (_player != null &&
+				!VeinMap.Instance.HasLineOfSight(worldPos, _player.GlobalPosition, 10f))
 				return false;
 		}
 

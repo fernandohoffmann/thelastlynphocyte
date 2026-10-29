@@ -50,11 +50,7 @@ public partial class ArsenalScreen : CanvasLayer
 		Visible     = false;
 		ProcessMode = ProcessModeEnum.Always;
 
-		var bg = new ColorRect { Color = new Color(0.06f, 0.02f, 0.04f, 0.97f) };
-		bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		bg.ZIndex      = -1;
-		bg.MouseFilter = Control.MouseFilterEnum.Ignore;
-		AddChild(bg);
+		MenuStyle.AddBackground(this, 0.93f);
 
 		_canvas = new Control();
 		_canvas.SetAnchorsPreset(Control.LayoutPreset.FullRect);
@@ -85,8 +81,8 @@ public partial class ArsenalScreen : CanvasLayer
 		topRow.OffsetBottom =  56;
 		ui.AddChild(topRow);
 
-		var backBtn = new Button { Text = "<- Voltar" };
-		backBtn.CustomMinimumSize = new Vector2(110, 36);
+		var backBtn = MenuStyle.MakeButton("<- VOLTAR", 46f);
+		backBtn.CustomMinimumSize = new Vector2(190, 46);
 		backBtn.Pressed += () => Visible = false;
 		topRow.AddChild(backBtn);
 
@@ -96,8 +92,8 @@ public partial class ArsenalScreen : CanvasLayer
 			HorizontalAlignment = HorizontalAlignment.Center,
 			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
 		};
-		title.AddThemeFontSizeOverride("font_size", 16);
-		title.AddThemeColorOverride("font_color", new Color(0.9f, 0.7f, 0.2f));
+		title.AddThemeFontSizeOverride("font_size", MenuStyle.FONT_TITLE);
+		title.AddThemeColorOverride("font_color", new Color(0.95f, 0.30f, 0.34f));
 		topRow.AddChild(title);
 
 		_dnaLabel = new Label
@@ -106,8 +102,8 @@ public partial class ArsenalScreen : CanvasLayer
 			HorizontalAlignment = HorizontalAlignment.Right,
 			CustomMinimumSize   = new Vector2(160, 0)
 		};
-		_dnaLabel.AddThemeFontSizeOverride("font_size", 12);
-		_dnaLabel.AddThemeColorOverride("font_color", new Color(0.4f, 1f, 0.5f));
+		_dnaLabel.AddThemeFontSizeOverride("font_size", MenuStyle.FONT_BODY);
+		_dnaLabel.AddThemeColorOverride("font_color", MenuStyle.DNA);
 		topRow.AddChild(_dnaLabel);
 
 		// ── Legenda ───────────────────────────────────────────────
@@ -131,17 +127,7 @@ public partial class ArsenalScreen : CanvasLayer
 		_tooltip.Visible = false;
 		_tooltip.ZIndex  = 60;
 
-		var ttStyle = new StyleBoxFlat();
-		ttStyle.BgColor             = new Color(0.08f, 0.06f, 0.10f, 0.97f);
-		ttStyle.BorderColor         = new Color(0.5f, 0.5f, 0.6f, 0.8f);
-		ttStyle.BorderWidthLeft     = 1;
-		ttStyle.BorderWidthRight    = 1;
-		ttStyle.BorderWidthTop      = 1;
-		ttStyle.BorderWidthBottom   = 1;
-		ttStyle.ContentMarginLeft   = 10;
-		ttStyle.ContentMarginRight  = 10;
-		ttStyle.ContentMarginTop    =  8;
-		ttStyle.ContentMarginBottom =  8;
+		var ttStyle = MenuStyle.PanelFrame(16);
 		_tooltip.AddThemeStyleboxOverride("panel", ttStyle);
 		AddChild(_tooltip);
 
@@ -151,8 +137,8 @@ public partial class ArsenalScreen : CanvasLayer
 		_tooltip.AddChild(ttVbox);
 
 		_tooltipTitle = new Label();
-		_tooltipTitle.AddThemeFontSizeOverride("font_size", 11);
-		_tooltipTitle.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.5f));
+		_tooltipTitle.AddThemeFontSizeOverride("font_size", MenuStyle.FONT_BODY);
+		_tooltipTitle.AddThemeColorOverride("font_color", new Color(1f, 0.55f, 0.55f));
 		ttVbox.AddChild(_tooltipTitle);
 
 		_tooltipLevel = new Label();
@@ -408,14 +394,16 @@ public partial class DnaNode : Control
 		float half = _size / 2f;
 		var   c    = new Vector2(half, half);
 
-		// Glow hover
+		// halo no hover, na cor da moldura do menu
 		if (_hoverAnim > 0.01f)
 			DrawCircle(c, half + 10f * _hoverAnim,
-				new Color(_baseColor.R, _baseColor.G, _baseColor.B, 0.3f * _hoverAnim));
+				new Color(MenuStyle.LINE_ON.R, MenuStyle.LINE_ON.G, MenuStyle.LINE_ON.B,
+						  0.32f * _hoverAnim));
 
-		// Círculo fundo
+		// miolo escuro com um toque da cor do ramo, igual ao medalhao do menu
+		DrawCircle(c, half - 2f, new Color(0.08f, 0.02f, 0.03f, 0.95f * _alpha));
 		DrawCircle(c, half - 2f,
-			new Color(_baseColor.R, _baseColor.G, _baseColor.B, _alpha * 0.88f));
+			new Color(_baseColor.R, _baseColor.G, _baseColor.B, _alpha * 0.32f));
 
 		// Ícone dentro da bolinha
 		if (_icon != null)
@@ -431,13 +419,12 @@ public partial class DnaNode : Control
 		}
 
 		// Borda
-		float borderA = _isUnlocked ? 1f : (_canUnlock ? 0.85f : 0.25f);
+		float borderA = _isUnlocked ? 1f : (_canUnlock ? 0.85f : 0.30f);
+		Color ring    = _isUnlocked ? MenuStyle.LINE_ON
+					  : _canUnlock  ? MenuStyle.LINE
+									: MenuStyle.LINE_OFF;
 		DrawArc(c, half - 2f, 0f, Mathf.Tau, 40,
-			new Color(
-				Mathf.Min(_baseColor.R + 0.25f, 1f),
-				Mathf.Min(_baseColor.G + 0.25f, 1f),
-				Mathf.Min(_baseColor.B + 0.25f, 1f),
-				borderA), 2.5f);
+			new Color(ring.R, ring.G, ring.B, borderA), 2.5f);
 
 		// Indicador de estado
 		if (!_isUnlocked && !_canUnlock)
@@ -445,16 +432,16 @@ public partial class DnaNode : Control
 			DrawCircle(c, half * 0.42f, new Color(0f, 0f, 0f, 0.72f));
 			DrawString(ThemeDB.FallbackFont,
 				new Vector2(half - 4f, half + 5f),
-				"?", HorizontalAlignment.Left, -1, 13,
-				new Color(0.6f, 0.6f, 0.6f));
+				"?", HorizontalAlignment.Left, -1, 16,
+				MenuStyle.TEXT_OFF);
 		}
 		else if (_canUnlock)
 		{
 			DrawCircle(c, half * 0.32f, new Color(0f, 0f, 0f, 0.65f));
 			DrawString(ThemeDB.FallbackFont,
 				new Vector2(half - 4f, half + 5f),
-				"!", HorizontalAlignment.Left, -1, 13,
-				new Color(1f, 0.9f, 0.2f));
+				"!", HorizontalAlignment.Left, -1, 16,
+				new Color(1f, 0.75f, 0.35f));
 		}
 
 		// Nome 12px abaixo da bolinha, centralizado

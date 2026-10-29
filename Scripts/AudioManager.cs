@@ -8,8 +8,8 @@ public partial class AudioManager : Node
 	private AudioStreamPlayer _sfxPlayer1;
 	private AudioStreamPlayer _sfxPlayer2;
 	private AudioStreamPlayer _sfxPlayer3;
-	private AudioStreamPlayer _musicPlayer;   // coração / rock
-	private AudioStreamPlayer _fadePlayer;    // fade in do rock após intro
+	private AudioStreamPlayer _musicPlayer;
+	private AudioStreamPlayer _fadePlayer;
 
 	private AudioStream _playerHit;
 	private AudioStream _enemyHit;
@@ -22,7 +22,6 @@ public partial class AudioManager : Node
 	private AudioStream _rock1;
 	private AudioStream _rock2;
 
-	// Músicas de rock em ordem aleatória
 	private List<AudioStream> _rockTracks = new();
 	private int               _rockIndex  = 0;
 	private bool              _playingRock = false;
@@ -30,7 +29,11 @@ public partial class AudioManager : Node
 	public float MusicVolume { get; private set; } = 0.8f;
 	public float SfxVolume   { get; private set; } = 1.0f;
 
-	// Fade in da música após intro
+	// Ganho so do loop de coracao, somado ao volume de musica.
+	// +8 dB e pouco mais que o dobro da amplitude percebida.
+	private const float HEART_GAIN_DB = 8f;
+	private bool  _heartPlaying = false;
+
 	private float _fadeTarget  = 0f;
 	private float _fadeSpeed   = 0f;
 	private bool  _fading      = false;
@@ -39,6 +42,10 @@ public partial class AudioManager : Node
 	{
 		if (Instance != null) { QueueFree(); return; }
 		Instance = this;
+
+		// Carrega volume salvo (senão fica sempre no padrão de fábrica)
+		MusicVolume = SaveData.MusicVolume;
+		SfxVolume   = SaveData.SfxVolume;
 
 		_sfxPlayer1  = new AudioStreamPlayer { Bus = "Master" };
 		_sfxPlayer2  = new AudioStreamPlayer { Bus = "Master" };
@@ -65,7 +72,6 @@ public partial class AudioManager : Node
 		if (_rock1 != null) _rockTracks.Add(_rock1);
 		if (_rock2 != null) _rockTracks.Add(_rock2);
 
-		// Embaralha
 		if (_rockTracks.Count > 1)
 		{
 			var tmp = _rockTracks[0];
@@ -99,11 +105,20 @@ public partial class AudioManager : Node
 	public void SetMusicVolume(float v)
 	{
 		MusicVolume = Mathf.Clamp(v, 0f, 1f);
-		if (!_fading)
-			_musicPlayer.VolumeDb = ToDb(MusicVolume);
+
+		if (_fading)
+			_fadeTarget = MusicVolume; // atualiza o alvo do fade em andamento
+		else
+			_musicPlayer.VolumeDb = ToDb(MusicVolume) + (_heartPlaying ? HEART_GAIN_DB : 0f);
+
+		SaveData.SetMusicVolume(MusicVolume);
 	}
 
-	public void SetSfxVolume(float v) { SfxVolume = Mathf.Clamp(v, 0f, 1f); }
+	public void SetSfxVolume(float v)
+	{
+		SfxVolume = Mathf.Clamp(v, 0f, 1f);
+		SaveData.SetSfxVolume(SfxVolume);
+	}
 
 	private void Play1(AudioStream stream, float volumeDb = 0f, float pitch = 1f)
 	{
@@ -141,58 +156,66 @@ public partial class AudioManager : Node
 		_sfxPlayer3.Play(0.4f);
 	}
 
-	// ── Músicas de Rock ───────────────────────────────────────
 	public void StartRockMusic(bool fadeIn = false, float fadeDuration = 3f)
 	{
-		if (_rockTracks.Count == 0) return;
-		StopHeartLoop();
-		_playingRock = true;
-		_rockIndex   = (int)(GD.Randi() % (uint)_rockTracks.Count);
-
-		_musicPlayer.Stream   = _rockTracks[_rockIndex];
-		_musicPlayer.VolumeDb = fadeIn ? -80f : ToDb(MusicVolume);
-		_musicPlayer.Play();
-
-		if (fadeIn && fadeDuration > 0f)
-		{
-			_fadeTarget = MusicVolume;
-			_fadeSpeed  = MusicVolume / fadeDuration;
-			_fading     = true;
-		}
+		PlayHeartLoop();
 	}
 
 	public void StopRockMusic()
 	{
-		_playingRock = false;
+		_playingRock  = false;
+		_heartPlaying = false;
 		_musicPlayer.Stop();
+		_musicPlayer.StreamPaused = false;
 	}
 
 	private void OnMusicFinished()
 	{
 		if (!_playingRock) return;
-		// Próxima música em ordem aleatória
 		_rockIndex = (_rockIndex + 1 + (int)(GD.Randi() % (uint)_rockTracks.Count)) % _rockTracks.Count;
 		_musicPlayer.Stream   = _rockTracks[_rockIndex];
 		_musicPlayer.VolumeDb = ToDb(MusicVolume);
 		_musicPlayer.Play();
 	}
 
-	// ── Loop de coração ───────────────────────────────────────
 	public void PlayHeartLoop()
 	{
-		if (_heartLoop == null || _musicPlayer.Playing) return;
-		_playingRock          = false;
-		_musicPlayer.Stream   = _heartLoop;
-		_musicPlayer.VolumeDb = ToDb(MusicVolume);
-		_musicPlayer.PitchScale = 4.0f;
+		if (_heartLoop == null) return;
+
+		// Um player PAUSADO continua reportando Playing == true. Sem esta checagem
+		// extra, sair do jogo pausado deixava o coracao mudo pro resto da sessao.
+		bool alreadyRunning = _musicPlayer.Playing
+						   && !_musicPlayer.StreamPaused
+						   && _musicPlayer.Stream == _heartLoop;
+		if (alreadyRunning) return;
+
+		_playingRock  = false;
+		_heartPlaying = true;
+
+		// Play() NAO limpa o StreamPaused: se ficou preso em true, nada sai.
+		_musicPlayer.StreamPaused = false;
+
+		_musicPlayer.Stream     = _heartLoop;
+		_musicPlayer.VolumeDb   = ToDb(MusicVolume) + HEART_GAIN_DB;
+		// o pitch e controlado pelo UpdateHeartPitch (1.0 -> 2.2 ao longo da run)
+		_musicPlayer.PitchScale = 1.0f;
+
+		// remover antes de somar evita acumular inscricoes a cada chamada
 		_musicPlayer.Finished -= OnMusicFinished;
+		_musicPlayer.Finished -= LoopHeart;
 		_musicPlayer.Finished += LoopHeart;
+
 		_musicPlayer.Play();
+
+		if (MusicVolume <= 0.01f)
+			GD.Print("[AudioManager] coracao tocando, mas o volume de musica esta em 0");
 	}
 
 	public void StopHeartLoop()
 	{
+		_heartPlaying = false;
 		_musicPlayer.Stop();
+		_musicPlayer.StreamPaused = false; // nao deixa o estado preso pra proxima run
 		_musicPlayer.Finished -= LoopHeart;
 	}
 

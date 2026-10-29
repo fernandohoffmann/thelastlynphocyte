@@ -127,6 +127,9 @@ public partial class GameManager : Node
 	{
 		IsGameRunning    = false;
 		GetTree().Paused = false;
+
+		// concluir uma fase libera a seguinte
+		GamePhase.Unlock(GamePhase.Current + 1);
 	}
 
 	public void ReturnToMenu()
@@ -134,8 +137,17 @@ public partial class GameManager : Node
 		IsGameRunning    = false;
 		IsPaused         = false;
 		GetTree().Paused = false;
+		AudioManager.Instance?.StopRockMusic();
+		AudioManager.Instance?.StopHeartLoop();
 		GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
 	}
 
 	public float GetRemainingTime() => Mathf.Max(0f, MAX_TIME - ElapsedTime);
+
+	/// Usado pelo painel de debug. A dificuldade se recalcula sozinha no
+	/// _Process a partir do ElapsedTime, entao nao precisa mexer nela aqui.
+	public void DebugAddTime(float seconds)
+	{
+		ElapsedTime = Mathf.Clamp(ElapsedTime + seconds, 0f, MAX_TIME);
+	}
 }
