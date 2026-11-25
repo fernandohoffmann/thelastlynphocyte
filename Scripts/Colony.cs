@@ -15,7 +15,10 @@ public partial class Colony : Enemy
 		BaseDamage = 0;
 		BaseXp     = 40;
 		BodyRadius = 34f;
-		BodyColor  = new Color(0.55f, 0.05f, 0.05f);
+		// fase 2 (pulmao): foco de pneumonia roxo, combinando com as bacterias
+		BodyColor  = GamePhase.Current >= 2
+			? new Color(0.45f, 0.10f, 0.62f)
+			: new Color(0.55f, 0.05f, 0.05f);
 		UseSprite  = false;
 
 		base._Ready();

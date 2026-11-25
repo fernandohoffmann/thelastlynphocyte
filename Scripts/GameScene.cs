@@ -80,7 +80,7 @@ public partial class GameScene : Node2D
 			CodexId.Linfocito, CodexId.Hemacia, CodexId.Circulacao);
 
 		// ── Sistema de missões ──────────────────────────────────
-		// A fase 2 ainda nao tem missoes: roda so contra o relogio.
+		// Cada fase define se tem missoes e quais (ver MissionManager).
 		if (GamePhase.Data.HasMissions)
 		{
 			_missionManager = new MissionManager { Name = "MissionManager" };
@@ -94,6 +94,12 @@ public partial class GameScene : Node2D
 		var options = UpgradeManager.Instance?.GetLevelUpOptions(3);
 		if (options != null && options.Count > 0)
 			_upgradeScreen?.ShowOptions(options);
+
+		// ── Tutorial (so na primeira vez que o jogo e jogado) ───
+		// Criado DEPOIS do ShowOptions: o primeiro passo ensina a escolher
+		// a arma e precisa encontrar a tela de upgrade ja aberta.
+		if (!SaveData.TutorialGameDone)
+			AddChild(new TutorialOverlay { Name = "TutorialOverlay", UpgradeScreenRef = _upgradeScreen });
 
 		// ── Efeitos visuais ──────────────────────────────────────
 		if (DebugPanel.ENABLED)

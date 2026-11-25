@@ -79,7 +79,7 @@ public static class GamePhase
 			GameTint       = new Color(0.42f, 0.30f, 0.52f),
 			HasVeinWalls   = false,
 			HasLungWalls   = true,    // a silhueta do pulmao vira a parede
-			HasMissions    = false,   // fase 2 ainda sem missoes
+			HasMissions    = true,    // missoes do pulmao (sem boss) — ver MissionManager
 			HasBloodCells  = false,   // nada de globulo vermelho no pulmao
 			HasVeinOverlay = false,   // nem os capilares vermelhos
 			ShowTileMap    = false,   // o tilemap da cena e da fase 1
@@ -122,6 +122,7 @@ public static class GamePhase
 
 	public static void Unlock(int number)
 	{
+		if (number > MAX_PHASE) return;   // nao existe fase alem da ultima
 		if (IsUnlocked(number)) return;
 		SaveData.UnlockPhase(number);
 		GD.Print($"[GamePhase] fase {number} liberada");

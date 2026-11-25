@@ -16,6 +16,12 @@ public partial class LoadoutScreen : CanvasLayer
 
 	private Dictionary<UpgradeId, IconSlot> _iconPanels = new();
 
+	// areas que o tutorial da primeira vez destaca
+	private VBoxContainer _weaponCol;
+	private VBoxContainer _passiveCol;
+	private Button        _startBtn;
+	private LoadoutHint   _hint;
+
 	// Referências injetadas pelo MainMenu
 	public static IntroScreen   IntroScreenRef   = null;
 	public static ConfirmDialog ConfirmDialogRef = null;
@@ -79,6 +85,7 @@ public partial class LoadoutScreen : CanvasLayer
 
 		// ── Armas ─────────────────────────────────────────────────
 		var weaponCol = new VBoxContainer();
+		_weaponCol = weaponCol;
 		weaponCol.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		weaponCol.AddThemeConstantOverride("separation", 10);
 		columns.AddChild(weaponCol);
@@ -105,6 +112,7 @@ public partial class LoadoutScreen : CanvasLayer
 
 		// ── Passivas ──────────────────────────────────────────────
 		var passiveCol = new VBoxContainer();
+		_passiveCol = passiveCol;
 		passiveCol.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		passiveCol.AddThemeConstantOverride("separation", 10);
 		columns.AddChild(passiveCol);
@@ -130,6 +138,7 @@ public partial class LoadoutScreen : CanvasLayer
 		root.AddChild(new HSeparator());
 
 		var startBtn = new Button { Text = "INICIAR PARTIDA" };
+		_startBtn = startBtn;
 		startBtn.CustomMinimumSize = new Vector2(0, 60);
 		startBtn.AddThemeFontSizeOverride("font_size", 16);
 		startBtn.Pressed += OnStart;
@@ -329,6 +338,9 @@ public partial class LoadoutScreen : CanvasLayer
 
 	private void OnStart()
 	{
+		// quem inicia direto nao precisa mais do tutorial
+		_hint?.Dismiss();
+
 		if (_selectedWeapons.Count == 0)
 			_selectedWeapons.Add(UpgradeId.Anticorpos);
 
@@ -355,6 +367,47 @@ public partial class LoadoutScreen : CanvasLayer
 	{
 		Populate();
 		Visible = true;
+		MaybeStartTutorial();
+	}
+
+	// ── Tutorial da primeira vez ──────────────────────────────────────────
+	// Aparece uma unica vez (SaveData.TutorialLoadoutDone) e explica as tres
+	// areas da tela: armas, passivas e o botao de iniciar.
+	private void MaybeStartTutorial()
+	{
+		if (SaveData.TutorialLoadoutDone) return;
+		if (_hint != null && _hint.IsActive) return;
+
+		if (_hint == null)
+		{
+			_hint = new LoadoutHint { Name = "LoadoutHint" };
+			AddChild(_hint);
+		}
+
+		var steps = new List<LoadoutHint.HintStep>
+		{
+			new LoadoutHint.HintStep
+			{
+				Target = () => _weaponCol,
+				Title  = "AQUI VOCE SELECIONA SUAS ARMAS",
+				Body   = $"Clique em uma arma para equipar (ou de novo para remover). Voce leva ate {UpgradeManager.MAX_WEAPONS} armas para a partida. Passe o mouse por cima para ler a descricao."
+			},
+			new LoadoutHint.HintStep
+			{
+				Target = () => _passiveCol,
+				Title  = "AQUI, SUAS PASSIVAS",
+				Body   = $"Passivas melhoram seus atributos o tempo todo: vida, velocidade, XP e mais. Escolha ate {UpgradeManager.MAX_PASSIVES}."
+			},
+			new LoadoutHint.HintStep
+			{
+				Target = () => _startBtn,
+				Above  = true,
+				Title  = "PRONTO PARA COMECAR?",
+				Body   = "Clique em INICIAR PARTIDA. Se nao escolher nada, voce comeca so com os Anticorpos."
+			},
+		};
+
+		_hint.Begin(steps, () => SaveData.SetTutorialLoadoutDone());
 	}
 }
 

@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-public enum MissionType { SurviveTime, KillBacteria, DestroyColonies, KillTimed, DefeatBoss }
+public enum MissionType { SurviveTime, KillBacteria, KillVirus, DestroyColonies, KillTimed, DefeatBoss }
 
 public class MissionData
 {
@@ -24,7 +24,6 @@ public partial class MissionManager : Node
 	private float _subTimer     = 0f;
 
 	private int _coloniesDestroyed = 0;
-	private const int COLONIES_TOTAL = 3;
 
 	// Boss deve nascer bem longe do jogador
 	private const int   BOSS_SPAWN_SAMPLES = 24;
@@ -34,18 +33,37 @@ public partial class MissionManager : Node
 	{
 		Instance = this;
 
-		_missions = new List<MissionData>
-		{
-			new MissionData { Title = "Resistir ao primeiro ataque",             Type = MissionType.SurviveTime,     Target = 300 },
-			new MissionData { Title = "Conter a infeccao na corrente sanguinea", Type = MissionType.KillBacteria,    Target = 30  },
-			new MissionData { Title = "Localizar o foco da infeccao",           Type = MissionType.DestroyColonies, Target = COLONIES_TOTAL },
-			new MissionData { Title = "Purificar a corrente sanguinea",          Type = MissionType.KillTimed,       Target = 50, TimeLimit = 180f },
-			new MissionData { Title = "Eliminar a Doenca de Chagas",             Type = MissionType.DefeatBoss,      Target = 1   },
-		};
+		_missions = GamePhase.Current == 2 ? BuildLungMissions() : BuildVeinMissions();
 
 		Enemy.EnemyDied += OnEnemyDied;
 		StartNextMission();
 	}
+
+	// ── MISSOES POR FASE ──────────────────────────────────────────────────
+	// SurviveTime usa o tempo TOTAL da partida, entao so faz sentido como
+	// primeira missao da lista.
+
+	// Fase 1 — sistema circulatorio (termina no boss).
+	private static List<MissionData> BuildVeinMissions() => new List<MissionData>
+	{
+		new MissionData { Title = "Resistir ao primeiro ataque",             Type = MissionType.SurviveTime,     Target = 300 },
+		new MissionData { Title = "Conter a infeccao na corrente sanguinea", Type = MissionType.KillBacteria,    Target = 30  },
+		new MissionData { Title = "Localizar o foco da infeccao",           Type = MissionType.DestroyColonies, Target = 3   },
+		new MissionData { Title = "Purificar a corrente sanguinea",          Type = MissionType.KillTimed,       Target = 50, TimeLimit = 180f },
+		new MissionData { Title = "Eliminar a Doenca de Chagas",             Type = MissionType.DefeatBoss,      Target = 1   },
+	};
+
+	// Fase 2 — pulmoes. SEM boss: a ultima missao e uma limpeza contra o relogio.
+	// ── AJUSTE FINO AQUI (alvos e tempos) ────────────────────────────────
+	private static List<MissionData> BuildLungMissions() => new List<MissionData>
+	{
+		new MissionData { Title = "Resistir a invasao dos bronquios",       Type = MissionType.SurviveTime,     Target = 240 },
+		new MissionData { Title = "Eliminar as bacterias respiratorias",    Type = MissionType.KillBacteria,    Target = 40  },
+		new MissionData { Title = "Neutralizar os virus do pulmao",         Type = MissionType.KillVirus,       Target = 20  },
+		new MissionData { Title = "Destruir os focos de pneumonia",         Type = MissionType.DestroyColonies, Target = 4   },
+		new MissionData { Title = "Limpar os alveolos",                     Type = MissionType.KillTimed,       Target = 60, TimeLimit = 150f },
+	};
+	// ──────────────────────────────────────────────────────────────────────
 
 	public override void _ExitTree()
 	{
@@ -104,7 +122,7 @@ public partial class MissionManager : Node
 		var m = _missions[_currentIndex];
 
 		if (m.Type == MissionType.DestroyColonies)
-			SpawnColonies(COLONIES_TOTAL);
+			SpawnColonies(m.Target);
 
 		if (m.Type == MissionType.DefeatBoss)
 			SpawnBoss();
@@ -123,6 +141,7 @@ public partial class MissionManager : Node
 		{
 			MissionType.SurviveTime     => $"{_progress}/{m.Target}s",
 			MissionType.KillBacteria    => $"{_progress}/{m.Target}",
+			MissionType.KillVirus       => $"{_progress}/{m.Target}",
 			MissionType.DestroyColonies => $"{_coloniesDestroyed}/{m.Target}",
 			MissionType.KillTimed       => $"{_progress}/{m.Target} ({Mathf.Max(0, m.TimeLimit - _subTimer):0}s)",
 			MissionType.DefeatBoss      => ChagasBoss.Instance != null && IsInstanceValid(ChagasBoss.Instance)
@@ -169,6 +188,12 @@ public partial class MissionManager : Node
 			EmitProgress();
 			if (_progress >= m.Target) CompleteCurrentMission();
 		}
+		else if (m.Type == MissionType.KillVirus && enemy.Type == EnemyType.Virus)
+		{
+			_progress++;
+			EmitProgress();
+			if (_progress >= m.Target) CompleteCurrentMission();
+		}
 		else if (m.Type == MissionType.KillTimed)
 		{
 			_progress++;
@@ -180,14 +205,19 @@ public partial class MissionManager : Node
 	// folga minima da parede pra colonia/boss (o corpo deles e grande)
 	private const float COLONY_WALL_MARGIN = 70f;
 
+	// as colonias nascem longe do player, pra dar o que explorar
+	private const float COLONY_MIN_PLAYER_DIST = 700f;
+
 	private void SpawnColonies(int count)
 	{
 		if (GameManager.Instance == null) return;
 		var area = GameManager.Instance.PlayableArea;
+		Vector2? playerPos = Player.Instance?.GlobalPosition;
 
 		for (int i = 0; i < count; i++)
 		{
-			Vector2 pos = Vector2.Zero;
+			Vector2 pos   = Vector2.Zero;
+			bool    found = false;
 
 			// Sorteia ate cair num lugar livre. Sem isso a colonia pode
 			// nascer dentro de uma veia e ficar inalcancavel.
@@ -198,9 +228,20 @@ public partial class MissionManager : Node
 					(float)GD.RandRange(area.Position.Y + 200, area.End.Y - 200)
 				);
 
-				if (VeinMap.Instance == null || VeinMap.Instance.IsWalkable(pos, COLONY_WALL_MARGIN))
-					break;
+				if (VeinMap.Instance != null && !VeinMap.Instance.IsWalkable(pos, COLONY_WALL_MARGIN))
+					continue;
+
+				// nas ultimas tentativas aceita perto do player (mapa pequeno)
+				if (playerPos.HasValue && tries < 200 &&
+					pos.DistanceTo(playerPos.Value) < COLONY_MIN_PLAYER_DIST)
+					continue;
+
+				found = true;
+				break;
 			}
+
+			if (!found && VeinMap.Instance != null)
+				pos = VeinMap.Instance.RandomWalkablePoint(COLONY_WALL_MARGIN);
 
 			var colony = new Colony();
 			GetTree().CurrentScene.AddChild(colony);

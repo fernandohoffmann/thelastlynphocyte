@@ -10,6 +10,10 @@ public static class SaveData
 	public static HashSet<string> CodexUnlocked { get; private set; } = new();
 	public static HashSet<int>    UnlockedPhases { get; private set; } = new();
 
+	// Tutoriais: cada um aparece so na primeira vez e nunca mais.
+	public static bool TutorialGameDone    { get; private set; } = false;
+	public static bool TutorialLoadoutDone { get; private set; } = false;
+
 	public static float MusicVolume     { get; private set; } = 0.8f;
 	public static float SfxVolume       { get; private set; } = 1.0f;
 	public static bool  Fullscreen      { get; private set; } = false;
@@ -24,6 +28,8 @@ public static class SaveData
 			UnlockedItems   = new HashSet<string> { "Anticorpos" };
 			CodexUnlocked   = new HashSet<string>();
 			UnlockedPhases  = new HashSet<int>();
+			TutorialGameDone    = false;
+			TutorialLoadoutDone = false;
 			MusicVolume     = 0.8f;
 			SfxVolume       = 1.0f;
 			Fullscreen      = false;
@@ -42,6 +48,9 @@ public static class SaveData
 		var phases = cfg.GetValue("save", "phases", new Godot.Collections.Array());
 		foreach (var item in phases.AsGodotArray())
 			UnlockedPhases.Add(item.AsInt32());
+
+		TutorialGameDone    = cfg.GetValue("tutorial", "game_done",    false).AsBool();
+		TutorialLoadoutDone = cfg.GetValue("tutorial", "loadout_done", false).AsBool();
 
 		UnlockedItems = new HashSet<string>();
 		UnlockedItems.Add("Anticorpos");
@@ -77,6 +86,9 @@ public static class SaveData
 			phaseArr.Add(n);
 		cfg.SetValue("save", "phases", phaseArr);
 
+		cfg.SetValue("tutorial", "game_done",    TutorialGameDone);
+		cfg.SetValue("tutorial", "loadout_done", TutorialLoadoutDone);
+
 		cfg.SetValue("settings", "music_volume", MusicVolume);
 		cfg.SetValue("settings", "sfx_volume", SfxVolume);
 		cfg.SetValue("settings", "fullscreen", Fullscreen);
@@ -102,6 +114,20 @@ public static class SaveData
 	public static void UnlockPhase(int number)
 	{
 		UnlockedPhases.Add(number);
+		Save();
+	}
+
+	public static void SetTutorialGameDone()
+	{
+		if (TutorialGameDone) return;
+		TutorialGameDone = true;
+		Save();
+	}
+
+	public static void SetTutorialLoadoutDone()
+	{
+		if (TutorialLoadoutDone) return;
+		TutorialLoadoutDone = true;
 		Save();
 	}
 
@@ -152,6 +178,8 @@ public static class SaveData
 		UnlockedItems = new HashSet<string> { "Anticorpos" };
 		CodexUnlocked  = new HashSet<string>();
 		UnlockedPhases = new HashSet<int>();
+		TutorialGameDone    = false;   // apagar o progresso traz os tutoriais de volta
+		TutorialLoadoutDone = false;
 		Save();
 		UpgradeManager.Instance?.ApplyLoadout(
 			new System.Collections.Generic.List<UpgradeId>(),

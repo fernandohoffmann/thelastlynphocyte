@@ -59,11 +59,15 @@ public partial class MissionCompleteScreen : CanvasLayer
 		Visible          = true;
 		GetTree().Paused = true;
 
-		// Avisa qual fase acabou de ser liberada
+		// Texto por fase + aviso da proxima fase liberada
+		string done = GamePhase.Current == 2
+			? "Os pulmoes foram limpos."
+			: "A infeccao foi controlada.";
+
 		int next = GamePhase.Current + 1;
 		_sub.Text = (next <= GamePhase.MAX_PHASE && GamePhase.IsUnlocked(next))
-			? $"A infeccao foi controlada.\nFASE {next} - {GamePhase.Get(next).Name} liberada!"
-			: "A infeccao foi controlada. Novas fases em breve.";
+			? $"{done}\nFASE {next} - {GamePhase.Get(next).Name} liberada!"
+			: $"{done} Novas fases em breve.";
 
 		// Silencia tudo imediatamente, não só ao clicar no botão
 		AudioManager.Instance?.StopRockMusic();
